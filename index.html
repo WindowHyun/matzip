@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>서울 맛집 지도 — 숙대·서울역·남대문</title>
+  <!-- ✅ 네이버 Client ID를 여기에 입력하세요 -->
+  <script type="text/javascript"
+    src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cx4ana6ne2">
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f5f0; --surface: #ffffff; --ink: #1a1a1a; --muted: #6b6b6b;
+      --noodle: #e85d26; --rice: #2c7a4b; --etc: #7b5ea7;
+      --border: #e2ddd6; --shadow: 0 2px 12px rgba(0,0,0,.08);
+      --danger: #e53e3e;
+    }
+    html, body { height: 100%; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--ink); }
+    .app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── 헤더 ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px; background: var(--surface);
+      border-bottom: 1px solid var(--border); box-shadow: var(--shadow);
+      z-index: 10; flex-shrink: 0;
+    }
+    header h1 { font-size: 15px; font-weight: 700; }
+    header span { font-size: 11px; color: var(--muted); margin-top: 2px; display: block; }
+    .add-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--ink); color: #fff;
+      border: none; border-radius: 8px; padding: 8px 14px;
+      font-size: 13px; font-family: inherit; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .add-btn:hover { opacity: .8; }
+
+    /* ── 필터 ── */
+    .filters {
+      display: flex; gap: 8px; padding: 10px 16px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; overflow-x: auto;
+    }
+    .filter-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 14px; border-radius: 20px;
+      border: 1.5px solid transparent; font-size: 13px;
+      font-family: inherit; cursor: pointer; white-space: nowrap; transition: all .15s;
+    }
+    .filter-btn.all    { background:#f0ede8; color:var(--ink); border-color:#ccc; }
+    .filter-btn.noodle { background:#fff4f0; color:var(--noodle); border-color:var(--noodle); }
+    .filter-btn.rice   { background:#f0faf4; color:var(--rice);   border-color:var(--rice); }
+    .filter-btn.etc    { background:#f5f0ff; color:var(--etc);    border-color:var(--etc); }
+    .filter-btn.active { font-weight: 700; }
+    .filter-btn:not(.active) { opacity: .5; }
+
+    .body { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── 사이드바 ── */
+    .sidebar {
+      width: 300px; flex-shrink: 0;
+      background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sidebar-header { padding: 12px 16px 8px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); flex-shrink: 0; }
+    .list { overflow-y: auto; flex: 1; }
+    .list-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 11px 16px; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background .1s;
+    }
+    .list-item:hover { background: #faf8f5; }
+    .list-item.active { background: #fdf6f2; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+    .dot.noodle { background: var(--noodle); } .dot.rice { background: var(--rice); } .dot.etc { background: var(--etc); }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-size: 13px; font-weight: 700; }
+    .item-menu { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .item-tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; }
+    .item-tag.noodle { background:#fff4f0; color:var(--noodle); }
+    .item-tag.rice   { background:#f0faf4; color:var(--rice); }
+    .item-tag.etc    { background:#f5f0ff; color:var(--etc); }
+    .item-stars { font-size: 11px; color: #f6a623; }
+
+    /* ── 지도 ── */
+    #map { flex: 1; }
+
+    /* ── 인포윈도우 ── */
+    .iw {
+      background: var(--surface); border-radius: 12px;
+      padding: 14px 16px; min-width: 230px; max-width: 290px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+    .iw-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .iw-name {
+      font-size: 14px; font-weight: 700;
+      color: var(--ink); text-decoration: none;
+    }
+    .iw-name:hover { text-decoration: underline; color: #0070cc; }
+    .iw-naver-badge {
+      font-size: 10px; background: #03c75a; color: #fff;
+      padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+    }
+    .iw-stars { margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .star-row { display: flex; gap: 2px; }
+    .star {
+      font-size: 18px; cursor: pointer; color: #ddd; transition: color .1s;
+      line-height: 1;
+    }
+    .star.on { color: #f6a623; }
+    .iw-rating-label { font-size: 11px; color: var(--muted); }
+    .iw-menu { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .iw-comment { font-size: 11px; color: var(--ink); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); line-height: 1.6; }
+    .iw-actions { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .iw-del-btn {
+      flex: 1; padding: 6px; border: 1.5px solid var(--danger); border-radius: 6px;
+      background: #fff5f5; color: var(--danger); font-size: 12px;
+      font-family: inherit; cursor: pointer; transition: background .1s;
+    }
+    .iw-del-btn:hover { background: #ffe0e0; }
+
+    /* ── 모달 ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      z-index: 100; display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface); border-radius: 16px;
+      padding: 24px; width: 360px; max-width: 90vw;
+      box-shadow: 0 8px 40px rgba(0,0,0,.2);
+      transform: translateY(20px); transition: transform .2s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 4px; }
+    .form-row input, .form-row select, .form-row textarea {
+      width: 100%; padding: 9px 12px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 13px; font-family: inherit;
+      outline: none; transition: border-color .15s;
+    }
+    .form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--ink); }
+    .form-row textarea { resize: vertical; min-height: 60px; }
+    .form-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .map-pick-btn {
+      width: 100%; padding: 8px; border: 1.5px dashed var(--border);
+      border-radius: 8px; background: #faf8f5; font-size: 12px;
+      font-family: inherit; cursor: pointer; color: var(--muted);
+      transition: border-color .15s;
+    }
+    .map-pick-btn:hover { border-color: var(--ink); color: var(--ink); }
+    .map-pick-btn.picking { border-color: var(--noodle); color: var(--noodle); background: #fff4f0; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .btn-cancel {
+      flex: 1; padding: 10px; border: 1.5px solid var(--border);
+      border-radius: 8px; background: #fff; font-size: 13px;
+      font-family: inherit; cursor: pointer;
+    }
+    .btn-submit {
+      flex: 2; padding: 10px; border: none;
+      border-radius: 8px; background: var(--ink); color: #fff;
+      font-size: 13px; font-family: inherit; cursor: pointer; font-weight: 700;
+    }
+    .btn-submit:hover { opacity: .85; }
+
+    /* 지도 위 안내 배너 */
+    #pick-banner {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: var(--noodle); color: #fff; padding: 8px 18px;
+      border-radius: 20px; font-size: 13px; z-index: 50;
+      display: none; pointer-events: none;
+    }
+    #pick-banner.show { display: block; }
+    .map-wrap { flex: 1; position: relative; }
+
+    @media (max-width: 640px) { .sidebar { display: none; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>🍜 서울 맛집 지도</h1>
+      <span id="count-label">숙대 · 서울역 · 남대문 일대</span>
+    </div>
+    <button class="add-btn" onclick="openAddModal()">＋ 맛집 추가</button>
+  </header>
+
+  <div class="filters">
+    <button class="filter-btn all active" onclick="filterMarkers('all')">🗂 전체</button>
+    <button class="filter-btn noodle" onclick="filterMarkers('noodle')">🍜 면류</button>
+    <button class="filter-btn rice"   onclick="filterMarkers('rice')">🍚 밥류+a</button>
+    <button class="filter-btn etc"    onclick="filterMarkers('etc')">🎪 기타</button>
+  </div>
+
+  <div class="body">
+    <div class="sidebar">
+      <div class="sidebar-header">목록 클릭 → 지도에서 확인</div>
+      <div class="list" id="list"></div>
+    </div>
+    <div class="map-wrap">
+      <div id="map" style="width:100%;height:100%;"></div>
+      <div id="pick-banner">📍 지도를 클릭해서 위치를 선택하세요</div>
+    </div>
+  </div>
+</div>
+
+<!-- 추가 모달 -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2>🍽 맛집 추가</h2>
+    <div class="form-row">
+      <label>매장명 *</label>
+      <input id="f-name" placeholder="예) 후암 쌀국수" />
+    </div>
+    <div class="form-row">
+      <label>카테고리 *</label>
+      <select id="f-cat">
+        <option value="noodle">🍜 면류</option>
+        <option value="rice">🍚 밥류+a</option>
+        <option value="etc">🎪 기타</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>메뉴 및 금액</label>
+      <input id="f-menu" placeholder="예) 소고기 쌀국수 9,500원" />
+    </div>
+    <div class="form-row">
+      <label>코멘트</label>
+      <textarea id="f-comment" placeholder="맛, 위치, 팁 등 자유롭게"></textarea>
+    </div>
+    <div class="form-row">
+      <label>위치 선택 *</label>
+      <button class="map-pick-btn" id="pick-btn" onclick="startPicking()">🗺 지도 클릭으로 위치 선택</button>
+      <div class="form-hint" id="pick-hint">위치가 선택되지 않았습니다</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAddModal()">취소</button>
+      <button class="btn-submit" onclick="submitAdd()">추가하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// 기본 데이터
+// ─────────────────────────────────────────────
+const DEFAULT_PLACES = [
+  { id:'d1',  name:"후암 쌀국수 (아시안)",    cat:"noodle", lat:37.5484953, lng:126.9759131, menu:"소고기 쌀국수 9,500원", comment:"후암동 / 완자도 넣어줌 맛있음 / 매운 쌀국수 9,500원" },
+  { id:'d2',  name:"노이덴 (쌀국수)",          cat:"noodle", lat:37.5516267, lng:126.9719719, menu:"쌀국수 11,000원", comment:"KDB 건너편 / 신기한 쌀국수 / 24시 영업" },
+  { id:'d3',  name:"사이공마켓 쌀국수",        cat:"noodle", lat:37.5451003, lng:126.9663797, menu:"양지쌀국수 9,000 / 피쉬볼 10,000원", comment:"갑을 반대편 굴다리 너머 짱맛" },
+  { id:'d4',  name:"유즈라멘",                 cat:"noodle", lat:37.5568098, lng:126.9682469, menu:"시오라멘 12,000 / 소유라멘 12,000", comment:"서울로 7017 윤슬 부근 / 면 육수 리필 가능 / 일찍 가야 함" },
+  { id:'d5',  name:"샤브숙 (1인샤브)",         cat:"noodle", lat:37.5453163, lng:126.9727982, menu:"1인 샤브 11,800원", comment:"숙대입구역 근처 / 얇은 고기·국물·어묵 등" },
+  { id:'d6',  name:"랑우 (쌀국수)",            cat:"noodle", lat:37.5538577, lng:126.9747236, menu:"13,000원 쌀국수", comment:"LG건물 지하 / 노이덴과 약간 반대 / 진한 쌀국수" },
+  { id:'d7',  name:"서양라멘",                 cat:"noodle", lat:37.5580801, lng:126.9750742, menu:"기본 라멘 / 시즌 별 10,000원대", comment:"팁홀튼 근처 / 한 숟가락 밥 / 면추가 무료 / 요쿠르트 작은거줌" },
+  { id:'d8',  name:"멘타미",                   cat:"noodle", lat:37.5415954, lng:126.9736283, menu:"미소라멘 11,000원", comment:"숙대입구 조금 더 걸어서 먹자골목 / 진한 4중 블렌드 미소 베이스" },
+  { id:'d9',  name:"오목칼국수",               cat:"noodle", lat:37.5521547, lng:126.9721171, menu:"닭칼국수 11,000 / 버섯만두 6,000", comment:"KDB 건너편 대전면가 옆 / 가격대비 양이 좀 아쉬움" },
+  { id:'d10', name:"아메리칸포하우스",          cat:"noodle", lat:37.5555334, lng:126.9673855, menu:"미쿡식 쌀국수 전문점", comment:"서울역 뒤편 / 전반적으로 낫베드한 쌀국수(미쿡식)" },
+  { id:'d11', name:"란주칼면",                 cat:"noodle", lat:37.561019,  lng:126.982148,  menu:"짜징도사면 9,000 / 짬뽕도사면 10,000", comment:"신세계백화점 본점 맞은편 / 처음에 짬짤 갈수록 매워짐" },
+  { id:'d12', name:"숙대 동아냉면",            cat:"noodle", lat:37.5444832, lng:126.9695033, menu:"물(비)냉 소 8,000 / 만두 6,000", comment:"숙대 근처 / 매운건 진짜 매움 / 양도 괜찮" },
+  { id:'d13', name:"곰냉면",                   cat:"noodle", lat:37.5605256, lng:126.9776721, menu:"합홍 스타일 냉면 12,000~13,000", comment:"남대문시장 안 / 여름엔 못 갈 집 / 양냥이 무료 주문 가능" },
+  { id:'d14', name:"서형 본점 (냉면)",          cat:"noodle", lat:37.5585227, lng:126.975406,  menu:"평양 스타일 냉면 17,000원", comment:"남대문 시장 가는 길 / 미슐랭 빕구르망 선정 / 짜배기 소주 가능" },
+  { id:'d15', name:"우모촌 (메밀소바)",         cat:"noodle", lat:37.5619642, lng:126.9982042, menu:"메밀소바 10,000원", comment:"남대문시장 머드 위 2층 / 기본 메밀소바 맛 / 곰배기 무료" },
+  { id:'d16', name:"루씽 (중식)",              cat:"noodle", lat:37.5554527, lng:126.9738314, menu:"8,000~13,000원 정도", comment:"서울스퀘어 안 / 전체적으로 패종급 속도에 퀄리티 높은 편" },
+  { id:'d17', name:"토마라멘",                 cat:"noodle", lat:37.5403546, lng:126.967691,  menu:"토마토라멘 11,000 / 매운토마토 12,000", comment:"남영역 용산경찰서 앞 / 토마토 특유의 신맛이 안남" },
+  { id:'d18', name:"차차타이 (태국)",           cat:"noodle", lat:37.5563143, lng:126.9682455, menu:"쌀국수 볶음밥 등 13,000~15,000", comment:"서울로 7017 윤슬 부근 / 나름 웨이팅도 있고 먹을 만 함" },
+  { id:'d19', name:"대도식당",                 cat:"rice",   lat:37.5542503, lng:126.9682938, menu:"8,000원대 메뉴", comment:"서울역 뒤편 / 백반집 / 고기류는 씹을 주심" },
+  { id:'d20', name:"모모키친 (돈까스)",         cat:"rice",   lat:37.5502913, lng:126.9748551, menu:"일반 11,000 / 치즈 12,000 / 로제 11,000", comment:"후암동 / 돈까스는 여기가 젤 맛있는 것 같아요" },
+  { id:'d21', name:"짱맛있어김밥",             cat:"rice",   lat:37.5492379, lng:126.9692144, menu:"아채김밥 3,500 ~ 치즈김밥 4,500", comment:"갑을 반대편 굴다리 너머 / 맛있습니다" },
+  { id:'d22', name:"홍가 추어탕",              cat:"rice",   lat:37.5517417, lng:126.9691573, menu:"홍가 추어탕 11,000 / 얼큰 추어탕 12,000", comment:"서울역 뒤편 / 건더기 많음 / 얼큰 추어탕 맵지 않음" },
+  { id:'d23', name:"가야해장",                 cat:"rice",   lat:37.5456993, lng:126.9701584, menu:"뼈해장국 11,000 / 곰창국밥 15,000", comment:"숙대가는 길 / 계란후라이 직접 가능 / 식사후 커피·매실차 무료" },
+  { id:'d24', name:"화기 (물갈비)",            cat:"rice",   lat:37.5576751, lng:126.9776441, menu:"양념갈비 정식 12,000 / 들기름막국수 8,000", comment:"남대문시장 건너편 / 시간 넉넉할 때 가기 좋음" },
+  { id:'d25', name:"산소식당",                 cat:"rice",   lat:37.5503579, lng:126.9745694, menu:"제육덮밥 9,000 / 김치수제비 8,000", comment:"후암동 / 밥 추가 무료 / 반찬 괜찮" },
+  { id:'d26', name:"베나레스 (인도카리)",       cat:"rice",   lat:37.5446228, lng:126.9688851, menu:"세트 12,000원대", comment:"숙대근처 인도카리 괜찮은 집 / 밥 무한 / 카리 추가 가능" },
+  { id:'d27', name:"마마돈까스",               cat:"rice",   lat:37.5598372, lng:126.976777,  menu:"돈까스류 11,000 / 돈부리 등 10,000", comment:"남대문시장 안 / 맛 좋음 / 대기 좀 있음" },
+  { id:'d28', name:"이치규 서울역점",           cat:"rice",   lat:37.5538865, lng:126.9748247, menu:"세트 메뉴 20,500 / 단품 2만 미만", comment:"KDB·LG건물 지하 / 밥 무한 / 나만을 위한 사치" },
+  { id:'d29', name:"뚝방길 서울역점",           cat:"rice",   lat:37.5534069, lng:126.9743428, menu:"돼지김치전골 10,000 / 계란말이 8,000", comment:"LG건물 맞은편 / 양 충분히 많고 라면사리 추가 굿" },
+  { id:'d30', name:"희락갈치 남대문 갈치골목",  cat:"rice",   lat:37.5599063, lng:126.9770883, menu:"갈치조림 14,000 / 고등어조림 14,000", comment:"남대문 갈치골목 두툼 중 하나 / 괜찮한 맛" },
+  { id:'d31', name:"앙계잖 닭한마리",          cat:"rice",   lat:37.5601579, lng:126.9678207, menu:"닭칼국수 / 닭곰탕 10,000원대", comment:"갑을 근처 / 그냥저냥 닭칼국수 가까이서 먹고 싶을 때" },
+  { id:'d32', name:"대박물갈비",               cat:"rice",   lat:37.5575138, lng:126.9776972, menu:"물갈비 1인분 14,000원", comment:"남대문 골목 / 전주식 물갈비 / 두영님 최애 / 웨이팅 있음" },
+  { id:'d33', name:"송옥 (메밀비빔국수)",       cat:"rice",   lat:37.5615559, lng:126.9773703, menu:"메밀비빔국수 11,000 / 뒤김우동 10,000", comment:"남대문~시청역 근처 / 우연히 찾은 맛집 / 판모밀이라 회전율 괜찮음" },
+  { id:'d34', name:"도라무통 즉석떡볶이 중림점",cat:"rice",   lat:37.557817,  lng:126.9672767, menu:"기본 떡볶이 3인 세트 24,000", comment:"서울역 뒤편 충정로역 가는 길 / 볶음밥 양 겁나 많음" },
+  { id:'d35', name:"달원순대",                 cat:"rice",   lat:37.5619073, lng:126.9731856, menu:"순대 11,000 / 특 13,000", comment:"시청역쪽 / 기본도 많고 마늘·들깨가루 마음껏 가능 / 피순대" },
+  { id:'d36', name:"슬로우갤러리 숭례문점",     cat:"rice",   lat:37.5590349, lng:126.9738246, menu:"각종 포케 및 샐러드류 11,000원~+", comment:"숭례문 바로 앞 / 가볍게 먹기 좋고 스프도 맛있음" },
+  { id:'d37', name:"동동만두 서울역점",         cat:"rice",   lat:37.5534199, lng:126.974342,  menu:"무침만두 6피스 6,000 / 고기만두 4피스 7,000", comment:"KDB 뒤편 / 계란국 진한데 무한리필 / 신물냄 없음" },
+  { id:'d38', name:"후라토 식당 서울스퀘어",    cat:"rice",   lat:37.5555215, lng:126.9738608, menu:"규카츠 / 스테이키 덮밥 14,000~19,500원", comment:"서울스퀘어 안 / 플랙스하고 싶은날 가기 좋음" },
+  { id:'d39', name:"도깨비 코티지 (남미)",      cat:"etc",    lat:37.5532367, lng:126.9770427, menu:"발레아다 1pcs 6,000 / 쁘요 쁘리또 16,000", comment:"특이하긴 한데 양이나 맛이 좀 아쉬움" },
+  { id:'d40', name:"남대문명물호떡",            cat:"etc",    lat:37.5600086, lng:126.9767975, menu:"꿀호떡 2,000 / 잡채호떡 2,500", comment:"남대문 갈치골목 바깥쪽 / 약간 튀기듯 하심" },
+];
+
+// ─────────────────────────────────────────────
+// localStorage 헬퍼
+// ─────────────────────────────────────────────
+function loadPlaces() {
+  try {
+    const stored = localStorage.getItem('matzip_places');
+    return stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(DEFAULT_PLACES));
+  } catch(e) { return JSON.parse(JSON.stringify(DEFAULT_PLACES)); }
+}
+function savePlaces() { localStorage.setItem('matzip_places', JSON.stringify(places)); }
+
+function loadRatings() {
+  try { return JSON.parse(localStorage.getItem('matzip_ratings') || '{}'); }
+  catch(e) { return {}; }
+}
+function saveRatings() { localStorage.setItem('matzip_ratings', JSON.stringify(ratings)); }
+
+let places  = loadPlaces();
+let ratings = loadRatings();
+
+// ─────────────────────────────────────────────
+// 지도 초기화
+// ─────────────────────────────────────────────
+const map = new naver.maps.Map('map', {
+  center: new naver.maps.LatLng(37.5545, 126.9730),
+  zoom: 15,
+  mapTypeId: naver.maps.MapTypeId.NORMAL
+});
+
+let activeFilter = 'all';
+let openIW = null;
+let activeListItem = null;
+const markerMap = {}; // id → { marker, iw }
+
+// ─────────────────────────────────────────────
+// 렌더링
+// ─────────────────────────────────────────────
+function renderAll() {
+  // 기존 마커 제거
+  Object.values(markerMap).forEach(({ marker, iw }) => {
+    iw.close(); marker.setMap(null);
+  });
+  Object.keys(markerMap).forEach(k => delete markerMap[k]);
+
+  const listEl = document.getElementById('list');
+  listEl.innerHTML = '';
+
+  places.forEach(p => {
+    // 마커
+    const icon = {
+      content: `<div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;background:${p.cat==='noodle'?'#e85d26':p.cat==='rice'?'#2c7a4b':'#7b5ea7'}">${p.cat==='noodle'?'🍜':p.cat==='rice'?'🍚':'🎪'}</div>`,
+      anchor: new naver.maps.Point(15, 30)
+    };
+    const marker = new naver.maps.Marker({
+      position: new naver.maps.LatLng(p.lat, p.lng),
+      map, icon, title: p.name
+    });
+
+    const naverSearchUrl = `https://map.naver.com/v5/search/${encodeURIComponent(p.name)}`;
+    const r = ratings[p.id] || 0;
+    const starsHtml = [1,2,3,4,5].map(n =>
+      `<span class="star ${n<=r?'on':''}" onclick="setRating('${p.id}',${n})" data-id="${p.id}" data-n="${n}">★</span>`
+    ).join('');
+
+    const iw = new naver.maps.InfoWindow({
+      content: `
+        <div class="iw">
+          <div class="iw-title-row">
+            <a class="iw-name" href="${naverSearchUrl}" target="_blank" rel="noopener">${p.name}</a>
+            <a href="${naverSearchUrl}" target="_blank" rel="noopener" class="iw-naver-badge">네이버지도</a>
+          </div>
+          <div class="iw-stars">
+            <div class="star-row" id="stars-${p.id}">${starsHtml}</div>
+            <span class="iw-rating-label" id="rating-label-${p.id}">${r > 0 ? r+'점' : '별점 없음'}</span>
+          </div>
+          <div class="iw-menu">${p.menu}</div>
+          ${p.comment ? `<div class="iw-comment">💬 ${p.comment}</div>` : ''}
+          <div class="iw-actions">
+            <button class="iw-del-btn" onclick="deletePlace('${p.id}')">🗑 삭제</button>
+          </div>
+        </div>`,
+      borderWidth: 0, backgroundColor: 'transparent',
+      anchorSize: new naver.maps.Size(0,0),
+      pixelOffset: new naver.maps.Point(0, -36)
+    });
+
+    naver.maps.Event.addListener(marker, 'click', () => openInfo(p.id));
+    markerMap[p.id] = { marker, iw };
+
+    // 리스트 아이템
+    const r2 = ratings[p.id] || 0;
+    const item = document.createElement('div');
+    item.className = 'list-item';
+    item.dataset.id = p.id;
+    item.innerHTML = `
+      <div class="dot ${p.cat}"></div>
+      <div class="item-info">
+        <div class="item-name">${p.name}</div>
+        <div class="item-menu">${p.menu}</div>
+        <div class="item-meta">
+          <span class="item-tag ${p.cat}">${p.cat==='noodle'?'면류':p.cat==='rice'?'밥류+a':'기타'}</span>
+          ${r2>0?`<span class="item-stars">${'★'.repeat(r2)}${'☆'.repeat(5-r2)}</span>`:''}
+        </div>
+      </div>`;
+    item.onclick = () => openInfo(p.id);
+    listEl.appendChild(item);
+  });
+
+  applyFilter();
+  updateCountLabel();
+}
+
+function updateCountLabel() {
+  const visible = places.filter(p => activeFilter==='all' || p.cat===activeFilter);
+  document.getElementById('count-label').textContent =
+    `숙대 · 서울역 · 남대문 일대 · ${visible.length}곳`;
+}
+
+// ─────────────────────────────────────────────
+// 인포윈도우
+// ─────────────────────────────────────────────
+function openInfo(id) {
+  if (openIW) openIW.close();
+  if (activeListItem) activeListItem.classList.remove('active');
+
+  const { marker, iw } = markerMap[id];
+  iw.open(map, marker);
+  openIW = iw;
+  map.panTo(marker.getPosition());
+
+  const item = document.querySelector(`.list-item[data-id="${id}"]`);
+  if (item) { item.classList.add('active'); item.scrollIntoView({ block:'nearest' }); activeListItem = item; }
+}
+
+naver.maps.Event.addListener(map, 'click', () => {
+  if (!isPicking) { if (openIW) { openIW.close(); openIW = null; } }
+  if (activeListItem) { activeListItem.classList.remove('active'); activeListItem = null; }
+});
+
+// ─────────────────────────────────────────────
+// 별점
+// ─────────────────────────────────────────────
+function setRating(id, n) {
+  ratings[id] = n;
+  saveRatings();
+
+  // 인포윈도우 별점 업데이트
+  const starsEl = document.getElementById(`stars-${id}`);
+  const labelEl = document.getElementById(`rating-label-${id}`);
+  if (starsEl) {
+    starsEl.querySelectorAll('.star').forEach(s => {
+      s.classList.toggle('on', parseInt(s.dataset.n) <= n);
+    });
+  }
+  if (labelEl) labelEl.textContent = n + '점';
+
+  // 사이드바 업데이트
+  const item = document.querySelector(`.list-item[data-id="${id}"] .item-meta`);
+  if (item) {
+    const existing = item.querySelector('.item-stars');
+    const starsStr = `<span class="item-stars">${'★'.repeat(n)}${'☆'.repeat(5-n)}</span>`;
+    if (existing) existing.outerHTML = starsStr;
+    else item.insertAdjacentHTML('beforeend', starsStr);
+  }
+}
+
+// ─────────────────────────────────────────────
+// 삭제
+// ─────────────────────────────────────────────
+function deletePlace(id) {
+  if (!confirm('이 맛집을 삭제할까요?')) return;
+  if (openIW) { openIW.close(); openIW = null; }
+  places = places.filter(p => p.id !== id);
+  savePlaces();
+  renderAll();
+}
+
+// ─────────────────────────────────────────────
+// 필터
+// ─────────────────────────────────────────────
+function filterMarkers(cat) {
+  activeFilter = cat;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.toggle('active', b.classList.contains(cat) || (cat==='all' && b.classList.contains('all')));
+  });
+  applyFilter();
+  updateCountLabel();
+}
+
+function applyFilter() {
+  places.forEach(p => {
+    const show = activeFilter==='all' || p.cat===activeFilter;
+    markerMap[p.id]?.marker.setVisible(show);
+    const item = document.querySelector(`.list-item[data-id="${p.id}"]`);
+    if (item) item.style.display = show ? '' : 'none';
+  });
+  if (openIW) { openIW.close(); openIW = null; }
+}
+
+// ─────────────────────────────────────────────
+// 추가 모달
+// ─────────────────────────────────────────────
+let isPicking = false;
+let pickedLat = null, pickedLng = null;
+let pickListener = null;
+
+function openAddModal() {
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeAddModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  stopPicking();
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-menu').value = '';
+  document.getElementById('f-comment').value = '';
+  pickedLat = null; pickedLng = null;
+  document.getElementById('pick-hint').textContent = '위치가 선택되지 않았습니다';
+  document.getElementById('pick-btn').textContent = '🗺 지도 클릭으로 위치 선택';
+  document.getElementById('pick-btn').classList.remove('picking');
+}
+
+function startPicking() {
+  if (isPicking) { stopPicking(); return; }
+  isPicking = true;
+  document.getElementById('pick-btn').textContent = '✋ 클릭 취소';
+  document.getElementById('pick-btn').classList.add('picking');
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.getElementById('pick-banner').classList.add('show');
+
+  pickListener = naver.maps.Event.addListener(map, 'click', e => {
+    pickedLat = e.coord.lat();
+    pickedLng = e.coord.lng();
+    stopPicking();
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('pick-hint').textContent = `📍 ${pickedLat.toFixed(6)}, ${pickedLng.toFixed(6)}`;
+    document.getElementById('pick-btn').textContent = '✅ 위치 재선택';
+    document.getElementById('pick-btn').classList.remove('picking');
+  });
+}
+
+function stopPicking() {
+  isPicking = false;
+  document.getElementById('pick-banner').classList.remove('show');
+  if (pickListener) { naver.maps.Event.removeListener(pickListener); pickListener = null; }
+}
+
+function submitAdd() {
+  const name = document.getElementById('f-name').value.trim();
+  const cat  = document.getElementById('f-cat').value;
+  const menu = document.getElementById('f-menu').value.trim();
+  const comment = document.getElementById('f-comment').value.trim();
+
+  if (!name) { alert('매장명을 입력해주세요.'); return; }
+  if (!pickedLat || !pickedLng) { alert('지도에서 위치를 선택해주세요.'); return; }
+
+  const newPlace = {
+    id: 'u' + Date.now(),
+    name, cat, lat: pickedLat, lng: pickedLng, menu, comment
+  };
+  places.push(newPlace);
+  savePlaces();
+  closeAddModal();
+  renderAll();
+
+  // 추가 후 해당 핀 열기
+  setTimeout(() => openInfo(newPlace.id), 300);
+}
+
+// ─────────────────────────────────────────────
+// 초기 실행
+// ─────────────────────────────────────────────
+renderAll();
+</script>
+</body>
+</html>
