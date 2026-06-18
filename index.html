@@ -16,10 +16,11 @@
       --noodle: #e85d26; --rice: #2c7a4b; --etc: #7b5ea7;
       --border: #e2ddd6; --shadow: 0 2px 12px rgba(0,0,0,.08);
       --danger: #e53e3e;
+      --move: #2563eb;
     }
     html, body { height: 100%; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--ink); }
     .app { display: flex; flex-direction: column; height: 100vh; }
-
+ 
     /* ── 헤더 ── */
     header {
       display: flex; align-items: center; justify-content: space-between;
@@ -37,7 +38,7 @@
       transition: opacity .15s;
     }
     .add-btn:hover { opacity: .8; }
-
+ 
     /* ── 필터 ── */
     .filters {
       display: flex; gap: 8px; padding: 10px 16px;
@@ -56,9 +57,9 @@
     .filter-btn.etc    { background:#f5f0ff; color:var(--etc);    border-color:var(--etc); }
     .filter-btn.active { font-weight: 700; }
     .filter-btn:not(.active) { opacity: .5; }
-
+ 
     .body { display: flex; flex: 1; overflow: hidden; }
-
+ 
     /* ── 사이드바 ── */
     .sidebar {
       width: 300px; flex-shrink: 0;
@@ -85,10 +86,10 @@
     .item-tag.rice   { background:#f0faf4; color:var(--rice); }
     .item-tag.etc    { background:#f5f0ff; color:var(--etc); }
     .item-stars { font-size: 11px; color: #f6a623; }
-
+ 
     /* ── 지도 ── */
     #map { flex: 1; }
-
+ 
     /* ── 인포윈도우 ── */
     .iw {
       background: var(--surface); border-radius: 12px;
@@ -123,7 +124,13 @@
       font-family: inherit; cursor: pointer; transition: background .1s;
     }
     .iw-del-btn:hover { background: #ffe0e0; }
-
+    .iw-move-btn {
+      flex: 1; padding: 6px; border: 1.5px solid #2563eb; border-radius: 6px;
+      background: #eff6ff; color: #2563eb; font-size: 12px;
+      font-family: inherit; cursor: pointer; transition: background .1s;
+    }
+    .iw-move-btn:hover { background: #dbeafe; }
+ 
     /* ── 모달 ── */
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,.45);
@@ -169,7 +176,7 @@
       font-size: 13px; font-family: inherit; cursor: pointer; font-weight: 700;
     }
     .btn-submit:hover { opacity: .85; }
-
+ 
     /* 지도 위 안내 배너 */
     #pick-banner {
       position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
@@ -179,7 +186,7 @@
     }
     #pick-banner.show { display: block; }
     .map-wrap { flex: 1; position: relative; }
-
+ 
     @media (max-width: 640px) { .sidebar { display: none; } }
   </style>
 </head>
@@ -192,14 +199,14 @@
     </div>
     <button class="add-btn" onclick="openAddModal()">＋ 맛집 추가</button>
   </header>
-
+ 
   <div class="filters">
     <button class="filter-btn all active" onclick="filterMarkers('all')">🗂 전체</button>
     <button class="filter-btn noodle" onclick="filterMarkers('noodle')">🍜 면류</button>
     <button class="filter-btn rice"   onclick="filterMarkers('rice')">🍚 밥류+a</button>
     <button class="filter-btn etc"    onclick="filterMarkers('etc')">🎪 기타</button>
   </div>
-
+ 
   <div class="body">
     <div class="sidebar">
       <div class="sidebar-header">목록 클릭 → 지도에서 확인</div>
@@ -207,11 +214,11 @@
     </div>
     <div class="map-wrap">
       <div id="map" style="width:100%;height:100%;"></div>
-      <div id="pick-banner">📍 지도를 클릭해서 위치를 선택하세요</div>
+      <div id="pick-banner"><span id="pick-banner-text">📍 지도를 클릭해서 위치를 선택하세요</span> &nbsp; <button onclick="cancelMove()" style="background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px;">취소</button></div>
     </div>
   </div>
 </div>
-
+ 
 <!-- 추가 모달 -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
@@ -247,7 +254,7 @@
     </div>
   </div>
 </div>
-
+ 
 <script>
 // ─────────────────────────────────────────────
 // 기본 데이터
@@ -294,7 +301,7 @@ const DEFAULT_PLACES = [
   { id:'d39', name:"도깨비 코티지 (남미)",      cat:"etc",    lat:37.5532367, lng:126.9770427, menu:"발레아다 1pcs 6,000 / 쁘요 쁘리또 16,000", comment:"특이하긴 한데 양이나 맛이 좀 아쉬움" },
   { id:'d40', name:"남대문명물호떡",            cat:"etc",    lat:37.5600086, lng:126.9767975, menu:"꿀호떡 2,000 / 잡채호떡 2,500", comment:"남대문 갈치골목 바깥쪽 / 약간 튀기듯 하심" },
 ];
-
+ 
 // ─────────────────────────────────────────────
 // localStorage 헬퍼
 // ─────────────────────────────────────────────
@@ -305,16 +312,16 @@ function loadPlaces() {
   } catch(e) { return JSON.parse(JSON.stringify(DEFAULT_PLACES)); }
 }
 function savePlaces() { localStorage.setItem('matzip_places', JSON.stringify(places)); }
-
+ 
 function loadRatings() {
   try { return JSON.parse(localStorage.getItem('matzip_ratings') || '{}'); }
   catch(e) { return {}; }
 }
 function saveRatings() { localStorage.setItem('matzip_ratings', JSON.stringify(ratings)); }
-
+ 
 let places  = loadPlaces();
 let ratings = loadRatings();
-
+ 
 // ─────────────────────────────────────────────
 // 지도 초기화
 // ─────────────────────────────────────────────
@@ -323,12 +330,12 @@ const map = new naver.maps.Map('map', {
   zoom: 15,
   mapTypeId: naver.maps.MapTypeId.NORMAL
 });
-
+ 
 let activeFilter = 'all';
 let openIW = null;
 let activeListItem = null;
 const markerMap = {}; // id → { marker, iw }
-
+ 
 // ─────────────────────────────────────────────
 // 렌더링
 // ─────────────────────────────────────────────
@@ -338,10 +345,10 @@ function renderAll() {
     iw.close(); marker.setMap(null);
   });
   Object.keys(markerMap).forEach(k => delete markerMap[k]);
-
+ 
   const listEl = document.getElementById('list');
   listEl.innerHTML = '';
-
+ 
   places.forEach(p => {
     // 마커
     const icon = {
@@ -352,13 +359,13 @@ function renderAll() {
       position: new naver.maps.LatLng(p.lat, p.lng),
       map, icon, title: p.name
     });
-
+ 
     const naverSearchUrl = `https://map.naver.com/v5/search/${encodeURIComponent(p.name)}`;
     const r = ratings[p.id] || 0;
     const starsHtml = [1,2,3,4,5].map(n =>
       `<span class="star ${n<=r?'on':''}" onclick="setRating('${p.id}',${n})" data-id="${p.id}" data-n="${n}">★</span>`
     ).join('');
-
+ 
     const iw = new naver.maps.InfoWindow({
       content: `
         <div class="iw">
@@ -373,6 +380,7 @@ function renderAll() {
           <div class="iw-menu">${p.menu}</div>
           ${p.comment ? `<div class="iw-comment">💬 ${p.comment}</div>` : ''}
           <div class="iw-actions">
+            <button class="iw-move-btn" onclick="startMovePlace('${p.id}')">📍 위치 수정</button>
             <button class="iw-del-btn" onclick="deletePlace('${p.id}')">🗑 삭제</button>
           </div>
         </div>`,
@@ -380,10 +388,10 @@ function renderAll() {
       anchorSize: new naver.maps.Size(0,0),
       pixelOffset: new naver.maps.Point(0, -36)
     });
-
+ 
     naver.maps.Event.addListener(marker, 'click', () => openInfo(p.id));
     markerMap[p.id] = { marker, iw };
-
+ 
     // 리스트 아이템
     const r2 = ratings[p.id] || 0;
     const item = document.createElement('div');
@@ -402,45 +410,45 @@ function renderAll() {
     item.onclick = () => openInfo(p.id);
     listEl.appendChild(item);
   });
-
+ 
   applyFilter();
   updateCountLabel();
 }
-
+ 
 function updateCountLabel() {
   const visible = places.filter(p => activeFilter==='all' || p.cat===activeFilter);
   document.getElementById('count-label').textContent =
     `숙대 · 서울역 · 남대문 일대 · ${visible.length}곳`;
 }
-
+ 
 // ─────────────────────────────────────────────
 // 인포윈도우
 // ─────────────────────────────────────────────
 function openInfo(id) {
   if (openIW) openIW.close();
   if (activeListItem) activeListItem.classList.remove('active');
-
+ 
   const { marker, iw } = markerMap[id];
   iw.open(map, marker);
   openIW = iw;
   map.panTo(marker.getPosition());
-
+ 
   const item = document.querySelector(`.list-item[data-id="${id}"]`);
   if (item) { item.classList.add('active'); item.scrollIntoView({ block:'nearest' }); activeListItem = item; }
 }
-
+ 
 naver.maps.Event.addListener(map, 'click', () => {
-  if (!isPicking) { if (openIW) { openIW.close(); openIW = null; } }
+  if (!isPicking && !movingId) { if (openIW) { openIW.close(); openIW = null; } }
   if (activeListItem) { activeListItem.classList.remove('active'); activeListItem = null; }
 });
-
+ 
 // ─────────────────────────────────────────────
 // 별점
 // ─────────────────────────────────────────────
 function setRating(id, n) {
   ratings[id] = n;
   saveRatings();
-
+ 
   // 인포윈도우 별점 업데이트
   const starsEl = document.getElementById(`stars-${id}`);
   const labelEl = document.getElementById(`rating-label-${id}`);
@@ -450,7 +458,7 @@ function setRating(id, n) {
     });
   }
   if (labelEl) labelEl.textContent = n + '점';
-
+ 
   // 사이드바 업데이트
   const item = document.querySelector(`.list-item[data-id="${id}"] .item-meta`);
   if (item) {
@@ -460,7 +468,7 @@ function setRating(id, n) {
     else item.insertAdjacentHTML('beforeend', starsStr);
   }
 }
-
+ 
 // ─────────────────────────────────────────────
 // 삭제
 // ─────────────────────────────────────────────
@@ -471,7 +479,72 @@ function deletePlace(id) {
   savePlaces();
   renderAll();
 }
-
+ 
+// ─────────────────────────────────────────────
+// 위치 수정
+// ─────────────────────────────────────────────
+let movingId = null;
+let moveListener = null;
+ 
+function startMovePlace(id) {
+  // 인포윈도우 닫기
+  if (openIW) { openIW.close(); openIW = null; }
+ 
+  movingId = id;
+  const place = places.find(p => p.id === id);
+  if (!place) return;
+ 
+  // 해당 마커 깜빡임 효과
+  const markerEl = markerMap[id]?.marker.getElement();
+  if (markerEl) markerEl.style.animation = 'pulse 0.8s infinite';
+ 
+  // 배너 표시
+  document.getElementById('pick-banner-text').textContent =
+    `📍 [${place.name}] 새 위치를 클릭해서 선택하세요`;
+  document.getElementById('pick-banner').classList.add('show');
+ 
+  // 지도 클릭 리스너
+  moveListener = naver.maps.Event.addListener(map, 'click', e => {
+    const newLat = e.coord.lat();
+    const newLng = e.coord.lng();
+    confirmMovePlace(movingId, newLat, newLng);
+  });
+}
+ 
+function confirmMovePlace(id, lat, lng) {
+  stopMove();
+  const place = places.find(p => p.id === id);
+  if (!place) return;
+  if (!confirm(`[${place.name}]\n이 위치로 이동할까요?\n(${lat.toFixed(5)}, ${lng.toFixed(5)})`)) {
+    // 취소 시 마커 원위치
+    return;
+  }
+  place.lat = lat;
+  place.lng = lng;
+  savePlaces();
+  renderAll();
+  // 수정된 핀 바로 열기
+  setTimeout(() => openInfo(id), 200);
+}
+ 
+function cancelMove() {
+  stopMove();
+}
+ 
+function stopMove() {
+  if (moveListener) {
+    naver.maps.Event.removeListener(moveListener);
+    moveListener = null;
+  }
+  // 마커 깜빡임 제거
+  if (movingId && markerMap[movingId]) {
+    const el = markerMap[movingId].marker.getElement();
+    if (el) el.style.animation = '';
+  }
+  movingId = null;
+  document.getElementById('pick-banner').classList.remove('show');
+}
+ 
 // ─────────────────────────────────────────────
 // 필터
 // ─────────────────────────────────────────────
@@ -483,7 +556,7 @@ function filterMarkers(cat) {
   applyFilter();
   updateCountLabel();
 }
-
+ 
 function applyFilter() {
   places.forEach(p => {
     const show = activeFilter==='all' || p.cat===activeFilter;
@@ -493,14 +566,14 @@ function applyFilter() {
   });
   if (openIW) { openIW.close(); openIW = null; }
 }
-
+ 
 // ─────────────────────────────────────────────
 // 추가 모달
 // ─────────────────────────────────────────────
 let isPicking = false;
 let pickedLat = null, pickedLng = null;
 let pickListener = null;
-
+ 
 function openAddModal() {
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -515,7 +588,7 @@ function closeAddModal() {
   document.getElementById('pick-btn').textContent = '🗺 지도 클릭으로 위치 선택';
   document.getElementById('pick-btn').classList.remove('picking');
 }
-
+ 
 function startPicking() {
   if (isPicking) { stopPicking(); return; }
   isPicking = true;
@@ -523,7 +596,7 @@ function startPicking() {
   document.getElementById('pick-btn').classList.add('picking');
   document.getElementById('modal-overlay').classList.remove('open');
   document.getElementById('pick-banner').classList.add('show');
-
+ 
   pickListener = naver.maps.Event.addListener(map, 'click', e => {
     pickedLat = e.coord.lat();
     pickedLng = e.coord.lng();
@@ -534,22 +607,22 @@ function startPicking() {
     document.getElementById('pick-btn').classList.remove('picking');
   });
 }
-
+ 
 function stopPicking() {
   isPicking = false;
   document.getElementById('pick-banner').classList.remove('show');
   if (pickListener) { naver.maps.Event.removeListener(pickListener); pickListener = null; }
 }
-
+ 
 function submitAdd() {
   const name = document.getElementById('f-name').value.trim();
   const cat  = document.getElementById('f-cat').value;
   const menu = document.getElementById('f-menu').value.trim();
   const comment = document.getElementById('f-comment').value.trim();
-
+ 
   if (!name) { alert('매장명을 입력해주세요.'); return; }
   if (!pickedLat || !pickedLng) { alert('지도에서 위치를 선택해주세요.'); return; }
-
+ 
   const newPlace = {
     id: 'u' + Date.now(),
     name, cat, lat: pickedLat, lng: pickedLng, menu, comment
@@ -558,11 +631,11 @@ function submitAdd() {
   savePlaces();
   closeAddModal();
   renderAll();
-
+ 
   // 추가 후 해당 핀 열기
   setTimeout(() => openInfo(newPlace.id), 300);
 }
-
+ 
 // ─────────────────────────────────────────────
 // 초기 실행
 // ─────────────────────────────────────────────
