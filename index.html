@@ -84,6 +84,31 @@
     .rec-tag { font-size: 10px; background:#ece8e1; color:var(--ink); padding: 2px 8px; border-radius: 10px; }
     .rec-comment { font-size: 11px; color: var(--ink); margin-top: 8px; line-height: 1.6; }
 
+    /* 룰렛 스핀 연출 */
+    .rec-spin {
+      position: relative; height: 56px; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 8px;
+      -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent);
+              mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent);
+    }
+    .rec-spin-name {
+      font-size: 16px; font-weight: 700; white-space: nowrap;
+      display: flex; align-items: center; gap: 8px;
+      animation: rollFlick .09s linear;
+    }
+    @keyframes rollFlick {
+      from { transform: translateY(-26px); opacity: 0; }
+      60%  { opacity: 1; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+    .rec-spin-cap { text-align: center; font-size: 12px; color: var(--noodle); font-weight: 700; margin-top: 8px; letter-spacing: 2px; }
+    .rec-card-reveal { animation: revealPop .35s cubic-bezier(.2,1.2,.4,1); }
+    @keyframes revealPop {
+      from { transform: scale(.9); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
     /* ── 필터 ── */
     .filters {
       display: flex; gap: 8px; padding: 10px 16px; align-items: center;
@@ -923,22 +948,33 @@ function saveNickname() {
 // 맛집 추천
 // ─────────────────────────────────────────────
 let recommendedId = null;
+let spinToken = 0;       // 진행 중인 스핀 식별 (중복/취소 방지)
+let isSpinning = false;
+
+function setGotoEnabled(on) {
+  const goto = document.getElementById('rec-goto-btn');
+  goto.disabled = !on; goto.style.opacity = on ? '1' : '.4';
+}
 
 function openRecommendModal() {
+  spinToken++;            // 진행 중이던 스핀 취소
+  isSpinning = false;
   document.getElementById('rec-result').innerHTML =
-    '<div class="rec-empty">위 카테고리를 선택하면<br>맛집을 추천해드립니다 🍽</div>';
+    '<div class="rec-empty">위 카테고리를 선택하면<br>룰렛이 주르르륵 돌아갑니다 🎰</div>';
   recommendedId = null;
-  const goto = document.getElementById('rec-goto-btn');
-  goto.disabled = true; goto.style.opacity = '.4';
+  setGotoEnabled(false);
   document.querySelectorAll('.rec-cat').forEach(b => b.classList.toggle('active', b.dataset.cat === 'all'));
   document.getElementById('rec-overlay').classList.add('open');
 }
 
 function closeRecommendModal() {
+  spinToken++;            // 닫으면 스핀 중단
+  isSpinning = false;
   document.getElementById('rec-overlay').classList.remove('open');
 }
 
 function recommendByCat(cat) {
+  if (isSpinning) return; // 돌아가는 중엔 무시
   document.querySelectorAll('.rec-cat').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
 
   const pool = places.filter(p => cat === 'all' || p.cat === cat);
@@ -946,8 +982,7 @@ function recommendByCat(cat) {
     document.getElementById('rec-result').innerHTML =
       '<div class="rec-empty">해당 카테고리에 등록된 맛집이 없어요 😢</div>';
     recommendedId = null;
-    const goto = document.getElementById('rec-goto-btn');
-    goto.disabled = true; goto.style.opacity = '.4';
+    setGotoEnabled(false);
     return;
   }
 
@@ -962,11 +997,47 @@ function recommendByCat(cat) {
   let r = Math.random() * total, picked = candidates[0];
   for (let i = 0; i < candidates.length; i++) { r -= weights[i]; if (r <= 0) { picked = candidates[i]; break; } }
 
-  recommendedId = picked.id;
-  renderRecResult(picked);
+  spinRoulette(pool, picked);
+}
 
-  const goto = document.getElementById('rec-goto-btn');
-  goto.disabled = false; goto.style.opacity = '1';
+// 룰렛 스핀: 이름이 주르르륵 돌다가 picked에서 멈춤
+function spinRoulette(pool, picked) {
+  const token = ++spinToken;
+  isSpinning = true;
+  setGotoEnabled(false);
+  const resultEl = document.getElementById('rec-result');
+
+  const totalDuration = pool.length > 1 ? 2200 : 600;
+  let elapsed = 0;
+  let delay = 55;       // 시작은 빠르게
+
+  function frame(p) {
+    const emoji = p.cat === 'noodle' ? '🍜' : p.cat === 'rice' ? '🍚' : '🎪';
+    resultEl.innerHTML =
+      `<div class="rec-spin"><div class="rec-spin-name">${emoji} ${p.name}</div></div>` +
+      `<div class="rec-spin-cap">두구두구두구…</div>`;
+  }
+
+  function tick() {
+    if (token !== spinToken) return;   // 취소됨
+    frame(pool[Math.floor(Math.random() * pool.length)]);
+    elapsed += delay;
+    if (elapsed >= totalDuration) {
+      // 마지막: 당첨 결과로 멈춤
+      frame(picked);
+      setTimeout(() => {
+        if (token !== spinToken) return;
+        recommendedId = picked.id;
+        renderRecResult(picked);
+        setGotoEnabled(true);
+        isSpinning = false;
+      }, 240);
+      return;
+    }
+    delay = 55 + Math.pow(elapsed / totalDuration, 2) * 260;  // 점점 느려짐
+    setTimeout(tick, delay);
+  }
+  tick();
 }
 
 function renderRecResult(p) {
@@ -980,15 +1051,17 @@ function renderRecResult(p) {
     ? `<div class="rec-tags">${p.tags.map(t => `<span class="rec-tag">${TAG_LABEL[t] || t}</span>`).join('')}</div>`
     : '';
   document.getElementById('rec-result').innerHTML = `
-    <div class="rec-card-head">
-      <span class="rec-emoji">${emoji}</span>
-      <span class="rec-name">${p.name}</span>
-      <span class="rec-cat-tag ${p.cat}">${catLabel}</span>
-    </div>
-    ${ratingHtml}
-    <div class="rec-menu">${p.menu || ''}</div>
-    ${tagsHtml}
-    ${p.comment ? `<div class="rec-comment">💬 ${p.comment}</div>` : ''}`;
+    <div class="rec-card-reveal">
+      <div class="rec-card-head">
+        <span class="rec-emoji">${emoji}</span>
+        <span class="rec-name">${p.name}</span>
+        <span class="rec-cat-tag ${p.cat}">${catLabel}</span>
+      </div>
+      ${ratingHtml}
+      <div class="rec-menu">${p.menu || ''}</div>
+      ${tagsHtml}
+      ${p.comment ? `<div class="rec-comment">💬 ${p.comment}</div>` : ''}
+    </div>`;
 }
 
 function gotoRecommend() {
