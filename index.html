@@ -504,13 +504,6 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = 'https://kvxprsqdqiazxpcdhfiu.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt2eHByc3FkcWlhenhwY2RoZml1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NzA2MzQsImV4cCI6MjA5NzM0NjYzNH0.1FYKu070t22fYIzJa_nx3oFrSugGiOu_VEWSOpvWpFY';
 
-// Cloudflare Turnstile 캡차 (활성화하려면: ① 아래에 site key 입력
-//  ② Supabase Dashboard → Auth → Settings → Enable Captcha + secret 입력)
-const TURNSTILE_SITEKEY = '';   // 비워두면 캡차 비활성
-
-// 마커 클러스터링 (데이터가 많아지면 true. 네이버 MarkerClustering 라이브러리 사용)
-const ENABLE_CLUSTERING = false;
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─────────────────────────────────────────────
@@ -553,9 +546,6 @@ const listItemMap = {};  // id → element
 
 let myLoc = null;          // { lat, lng }
 let sortByDistance = false;
-
-let CLUSTER = false;
-let clusterer = null;
 
 // ─────────────────────────────────────────────
 // 공용 헬퍼
@@ -687,7 +677,7 @@ function listItemInner(p) {
 function addPlaceToUI(p) {
   const marker = new naver.maps.Marker({
     position: new naver.maps.LatLng(p.lat, p.lng),
-    map: CLUSTER ? null : map, icon: markerIcon(p), title: p.name
+    map, icon: markerIcon(p), title: p.name
   });
   const iw = new naver.maps.InfoWindow({
     content: buildIwContent(p),
@@ -842,7 +832,6 @@ function startMovePlace(id) {
   if (!place) return;
   const { marker } = markerMap[id];
 
-  marker.setMap(map);   // 클러스터링 중에도 드래그 가능하게 표시
   marker.setDraggable(true);
   marker.setCursor('grab');
   const el = marker.getElement();
@@ -940,15 +929,12 @@ function onSearchInput() {
 
 function applyFilter() {
   const query = document.getElementById('search-input').value.trim().toLowerCase();
-  const visibleIds = [];
   places.forEach(p => {
     const show = matchesFilter(p, query);
-    if (show) visibleIds.push(p.id);
-    if (!CLUSTER) markerMap[p.id]?.marker.setVisible(show);
+    markerMap[p.id]?.marker.setVisible(show);
     const item = listItemMap[p.id];
     if (item) item.style.display = show ? '' : 'none';
   });
-  if (CLUSTER) rebuildCluster(visibleIds);
   if (openIW) { openIW.close(); openIW = null; openPlaceId = null; }
   updateCountLabel();
 }
@@ -1292,36 +1278,6 @@ function onSidebarHeaderClick(e) {
 }
 
 // ─────────────────────────────────────────────
-// 마커 클러스터링 (선택)
-// ─────────────────────────────────────────────
-async function initClustering() {
-  if (!ENABLE_CLUSTERING) return;
-  await new Promise(res => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/gh/navermaps/marker-tools.js@master/marker-clustering/src/MarkerClustering.js';
-    s.onload = res; s.onerror = res;
-    document.head.appendChild(s);
-  });
-  CLUSTER = typeof MarkerClustering !== 'undefined';
-  if (!CLUSTER) console.warn('클러스터링 라이브러리 로드 실패 — 일반 마커로 표시');
-}
-function rebuildCluster(visibleIds) {
-  if (!CLUSTER) return;
-  if (clusterer) clusterer.setMap(null);
-  const ms = visibleIds.map(id => markerMap[id]?.marker).filter(Boolean);
-  const html = '<div style="background:#e85d26;color:#fff;width:40px;height:40px;line-height:40px;border-radius:50%;text-align:center;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3);"></div>';
-  clusterer = new MarkerClustering({
-    minClusterSize: 2, maxZoom: 15, map, markers: ms, disableClickZoom: false, gridSize: 120,
-    icons: [{ content: html, size: new naver.maps.Size(40,40), anchor: new naver.maps.Point(20,20) }],
-    indexGenerator: [10, 30, 60],
-    stylingFunction: (clusterMarker, count) => {
-      const el = clusterMarker.getElement().querySelector('div');
-      if (el) el.textContent = count;
-    }
-  });
-}
-
-// ─────────────────────────────────────────────
 // 데이터 로드
 // ─────────────────────────────────────────────
 function upsertLocalPlace(p) {
@@ -1390,36 +1346,12 @@ function subscribeRealtime() {
 }
 
 // ─────────────────────────────────────────────
-// 익명 로그인 (+ 선택적 캡차)
+// 익명 로그인
 // ─────────────────────────────────────────────
-async function getCaptchaToken() {
-  if (!TURNSTILE_SITEKEY) return undefined;
-  await new Promise(res => {
-    if (window.turnstile) return res();
-    const s = document.createElement('script');
-    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-    s.async = true; s.defer = true; s.onload = res; s.onerror = res;
-    document.head.appendChild(s);
-  });
-  if (!window.turnstile) return undefined;
-  return new Promise(resolve => {
-    const holder = document.createElement('div');
-    holder.style.cssText = 'position:fixed;left:50%;top:20px;transform:translateX(-50%);z-index:200;';
-    document.body.appendChild(holder);
-    window.turnstile.render(holder, {
-      sitekey: TURNSTILE_SITEKEY,
-      callback: token => { holder.remove(); resolve(token); },
-      'error-callback': () => { holder.remove(); resolve(undefined); }
-    });
-  });
-}
-
 async function signIn() {
   const { data: { user } } = await supabase.auth.getUser();
   if (user) { currentUserId = user.id; return; }
-  const captchaToken = await getCaptchaToken();
-  const opts = captchaToken ? { options: { captchaToken } } : undefined;
-  const { error } = await supabase.auth.signInAnonymously(opts);
+  const { error } = await supabase.auth.signInAnonymously();
   if (error) throw error;
   const { data: { user: u2 } } = await supabase.auth.getUser();
   currentUserId = u2?.id || null;
@@ -1440,7 +1372,6 @@ async function init() {
   try { await signIn(); }
   catch (e) { console.warn('익명 로그인 실패 — 읽기 전용 모드', e); readOnly = true; toast('읽기 전용 모드 (익명 로그인 비활성)'); }
 
-  await initClustering();
   await Promise.all([loadPlaces(), loadSummaries(), loadMyRatings()]);
   renderAll();
   subscribeRealtime();
