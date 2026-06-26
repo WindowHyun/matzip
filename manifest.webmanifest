@@ -1,0 +1,15 @@
+{
+  "name": "서울 맛집 지도",
+  "short_name": "맛집지도",
+  "description": "숙대·서울역·남대문 일대 맛집 지도",
+  "lang": "ko",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f5f0",
+  "theme_color": "#e85d26",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
