@@ -43,6 +43,8 @@
       --accent: #e85d26; --soft: #26241e; --chip: #2c2922;
     }
     html, body { height: 100%; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--ink); }
+    html { -webkit-tap-highlight-color: transparent; }
+    button, select, .list-item, .sheet-handle, .sidebar-header, .star { touch-action: manipulation; }
     .app { display: flex; flex-direction: column; height: 100vh; }
 
     /* ── 헤더 ── */
@@ -223,7 +225,7 @@
     }
     .iw-sub-btn:hover { filter: brightness(.95); }
     .iw-sub-btn.fav-on { border-color: #e0447c; color: #e0447c; background: #fff0f5; }
-    .list { overflow-y: auto; flex: 1; }
+    .list { overflow-y: auto; flex: 1; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .list-item {
       display: flex; align-items: flex-start; gap: 10px;
       padding: 11px 16px; border-bottom: 1px solid var(--border);
@@ -371,12 +373,18 @@
         height: 62vh; z-index: 60; border-right: none;
         border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
         box-shadow: 0 -4px 20px rgba(0,0,0,.18);
-        transform: translateY(calc(62vh - 96px)); transition: transform .25s ease;
+        transform: translateY(calc(62vh - 96px));
+        transition: transform .28s cubic-bezier(.25,.8,.25,1);
+        will-change: transform;
       }
       .sidebar.expanded { transform: translateY(0); }
       .sheet-handle {
-        display: block; width: 44px; height: 5px; border-radius: 3px;
-        background: var(--border); margin: 8px auto 4px;
+        display: block; width: 140px; margin: 0 auto; padding: 10px 0 6px;
+        cursor: pointer;
+      }
+      .sheet-handle::before {
+        content: ''; display: block; width: 44px; height: 5px;
+        border-radius: 3px; background: var(--border); margin: 0 auto;
       }
       .sidebar-header { cursor: pointer; }
     }
@@ -626,7 +634,11 @@ const map = new naver.maps.Map('map', {
   mapTypeId: naver.maps.MapTypeId.NORMAL
 });
 
+// 모바일에서 시트가 접히는 순간 발생하는 고스트 클릭이 인포윈도우를 닫지 않도록 잠시 무시
+let suppressMapClickUntil = 0;
+
 naver.maps.Event.addListener(map, 'click', () => {
+  if (Date.now() < suppressMapClickUntil) return;
   if (!movingId && !isDraggingNew) {
     if (openIW) { openIW.close(); openIW = null; openPlaceId = null; }
     if (activeListItem) { activeListItem.classList.remove('active'); activeListItem = null; }
@@ -807,12 +819,19 @@ function openInfo(id) {
   openPlaceId = id;
   map.panTo(marker.getPosition());
 
+  const mobile = window.matchMedia('(max-width: 640px)').matches;
   const item = listItemMap[id];
-  if (item) { item.classList.add('active'); item.scrollIntoView({ block:'nearest' }); activeListItem = item; }
+  if (item) {
+    item.classList.add('active');
+    if (!mobile) item.scrollIntoView({ block:'nearest' });   // 모바일에선 시트가 접히므로 스크롤 불필요(버벅임 방지)
+    activeListItem = item;
+  }
 
-  // 모바일: 바텀시트가 인포윈도우를 가리지 않도록 자동 접기
-  if (window.matchMedia('(max-width: 640px)').matches)
-    document.getElementById('sidebar').classList.remove('expanded');
+  // 탭 직후 지도로 새는 고스트 클릭 차단 (팝업이 열리자마자 닫히는 문제)
+  suppressMapClickUntil = Date.now() + 700;
+
+  // 모바일: 탭 이벤트가 완전히 끝난 뒤 시트를 접어야 클릭이 지도로 새지 않음
+  if (mobile) setTimeout(() => document.getElementById('sidebar').classList.remove('expanded'), 250);
 }
 
 // ─────────────────────────────────────────────
