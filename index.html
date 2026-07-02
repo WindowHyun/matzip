@@ -772,7 +772,7 @@ function addPlaceToUI(p) {
     map, icon: markerIcon(p), title: p.name
   });
   const iw = new naver.maps.InfoWindow({
-    content: buildIwContent(p),
+    content: buildIwElement(p),
     borderWidth: 0, backgroundColor: 'transparent',
     anchorSize: new naver.maps.Size(0,0),
     pixelOffset: new naver.maps.Point(0, -36)
@@ -795,7 +795,7 @@ function updatePlaceUI(p) {
   entry.marker.setPosition(new naver.maps.LatLng(p.lat, p.lng));
   entry.marker.setIcon(markerIcon(p));
   entry.marker.setTitle(p.name);
-  entry.iw.setContent(buildIwContent(p));
+  entry.iw.setContent(buildIwElement(p));
   if (openPlaceId === p.id) entry.iw.open(map, entry.marker);
   const item = listItemMap[p.id];
   if (item) item.innerHTML = listItemInner(p);
@@ -889,7 +889,7 @@ function refreshRatingUI(id) {
   const entry = markerMap[id];
   const p = places.find(x => x.id === id);
   if (entry && p) {
-    entry.iw.setContent(buildIwContent(p));
+    entry.iw.setContent(buildIwElement(p));
     if (openPlaceId === id) entry.iw.open(map, entry.marker);
   }
   const item = listItemMap[id];
@@ -1405,24 +1405,40 @@ function toggleFavFilter() {
   applyFilter();
 }
 
-// 인포윈도우 등 동적 HTML의 버튼은 이벤트 위임으로 처리 (id를 onclick 문자열에 넣지 않음)
-document.addEventListener('click', e => {
+// 인포윈도우 버튼 공용 핸들러 (id를 onclick 문자열에 넣지 않음)
+// 처리한 이벤트는 stopPropagation으로 중복 실행 방지
+function handleActionClick(e) {
   const star = e.target.closest('.star[data-id]');
-  if (star) { setRating(star.dataset.id, parseInt(star.dataset.n)); return; }
+  if (star) { e.stopPropagation(); setRating(star.dataset.id, parseInt(star.dataset.n)); return; }
   const btn = e.target.closest('[data-action][data-id]');
   if (!btn) return;
+  e.stopPropagation();
   const { action, id } = btn.dataset;
   if (action === 'move') startMovePlace(id);
   else if (action === 'del') deletePlace(id);
   else if (action === 'nav') openDirections(id);
   else if (action === 'share') copyShareLink(id);
   else if (action === 'fav') toggleFav(id);
-});
-document.addEventListener('keydown', e => {
+}
+function handleStarKeydown(e) {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const star = e.target && e.target.closest && e.target.closest('.star[data-id]');
-  if (star) { e.preventDefault(); setRating(star.dataset.id, parseInt(star.dataset.n)); }
-});
+  if (star) { e.preventDefault(); e.stopPropagation(); setRating(star.dataset.id, parseInt(star.dataset.n)); }
+}
+
+// 네이버 지도는 인포윈도우 내부 클릭의 전파를 차단하므로,
+// document 위임만으로는 버튼이 동작하지 않음 → 콘텐츠 요소에 직접 바인딩
+function buildIwElement(p) {
+  const el = document.createElement('div');
+  el.innerHTML = buildIwContent(p);
+  el.addEventListener('click', handleActionClick);
+  el.addEventListener('keydown', handleStarKeydown);
+  return el;
+}
+
+// 인포윈도우 밖(다른 동적 영역) 대비 폴백
+document.addEventListener('click', handleActionClick);
+document.addEventListener('keydown', handleStarKeydown);
 
 // ─────────────────────────────────────────────
 // 다크모드 / 모바일 시트
@@ -1628,7 +1644,7 @@ window.__matzip = {
   get summaries(){ return summaries; },
   get openPlaceId(){ return openPlaceId; },
   get favs(){ return [...favs]; },
-  buildIwContent, onPlacesChange, onRatingsChange, esc, showUpdateBanner
+  buildIwContent, buildIwElement, onPlacesChange, onRatingsChange, esc, showUpdateBanner
 };
 
 init();
