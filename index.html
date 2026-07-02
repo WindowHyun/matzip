@@ -189,6 +189,7 @@
     }
     .tag-chip:hover { border-color: var(--ink); }
     .tag-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
+    .tag-chip.fav.active { background: #e0447c; border-color: #e0447c; color: #fff; }
 
     .body { display: flex; flex: 1; overflow: hidden; position: relative; }
 
@@ -211,11 +212,18 @@
     }
     .sort-near-btn:hover { border-color: var(--ink); }
     .sort-near-btn.on { background: var(--move); color: #fff; border-color: var(--move); font-weight: 700; }
-    #fav-filter-btn.on { background: #e0447c; border-color: #e0447c; }
     #sort-select {
-      background: var(--soft); border: 1.5px solid var(--border); color: var(--muted);
-      border-radius: 14px; padding: 4px 8px; font-size: 11px; font-family: inherit;
-      cursor: pointer; outline: none;
+      background: var(--soft); border: 1.5px solid var(--border); color: var(--ink);
+      border-radius: 14px; padding: 6px 10px; font-size: 12px; font-family: inherit;
+      font-weight: 700; cursor: pointer; outline: none;
+    }
+    #empty-state {
+      padding: 34px 16px; text-align: center; color: var(--muted);
+      font-size: 13px; display: flex; flex-direction: column; gap: 10px; align-items: center;
+    }
+    #empty-state button {
+      background: var(--accent); color: #fff; border: none; border-radius: 8px;
+      padding: 8px 16px; font-size: 12px; font-family: inherit; cursor: pointer; font-weight: 700;
     }
     .item-fav { font-size: 10px; }
     .iw-sub-btn {
@@ -352,6 +360,65 @@
     }
     #pick-banner.show { display: flex; }
 
+    /* 설정 메뉴 팝업 */
+    .menu-pop {
+      position: fixed; top: 62px; right: 12px; z-index: 120;
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.2);
+      padding: 6px; display: none; flex-direction: column; gap: 2px; min-width: 160px;
+    }
+    .menu-pop.open { display: flex; }
+    .menu-pop button {
+      text-align: left; background: none; border: none; border-radius: 8px;
+      padding: 11px 12px; font-size: 13px; font-family: inherit;
+      color: var(--ink); cursor: pointer; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .menu-pop button:hover { background: var(--soft); }
+
+    /* 로딩 오버레이 */
+    #loading {
+      position: absolute; inset: 0; z-index: 70;
+      background: var(--bg); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 10px;
+      color: var(--muted); font-size: 13px;
+    }
+    .loading-bowl { font-size: 42px; animation: bowlBounce 1s ease-in-out infinite; }
+    @keyframes bowlBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    /* 룰렛 컨페티 */
+    .rec-result { position: relative; overflow: hidden; }
+    .confetti {
+      position: absolute; top: -10px; width: 8px; height: 12px; border-radius: 2px;
+      pointer-events: none; animation: confettiFall 1.2s ease-in forwards;
+    }
+    @keyframes confettiFall {
+      to { transform: translateY(240px) rotate(560deg); opacity: 0; }
+    }
+
+    /* 버튼 눌림 피드백 */
+    button { transition: transform .08s; }
+    button:active { transform: scale(.95); }
+    .list-item:active { background: var(--chip); }
+
+    /* 추가 모달 단계 뱃지 */
+    .step-badge {
+      font-size: 11px; background: var(--chip); color: var(--muted);
+      padding: 2px 8px; border-radius: 10px; vertical-align: middle; margin-left: 6px;
+    }
+
+    /* 다크모드 칩/버튼 색 보정 */
+    [data-theme="dark"] .filter-btn.noodle, [data-theme="dark"] .item-tag.noodle, [data-theme="dark"] .rec-cat-tag.noodle { background: #3b2317; }
+    [data-theme="dark"] .filter-btn.rice,   [data-theme="dark"] .item-tag.rice,   [data-theme="dark"] .rec-cat-tag.rice   { background: #16301f; }
+    [data-theme="dark"] .filter-btn.etc,    [data-theme="dark"] .item-tag.etc,    [data-theme="dark"] .rec-cat-tag.etc    { background: #2a2338; }
+    [data-theme="dark"] .iw-del-btn { background: #3a1f1f; }
+    [data-theme="dark"] .iw-move-btn { background: #1c2940; }
+    [data-theme="dark"] .iw-sub-btn.fav-on { background: #3a2031; }
+    [data-theme="dark"] .map-pick-btn.picking { background: #3b2317; }
+
     /* 업데이트 알림 배너 */
     #update-banner {
       position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(110px);
@@ -400,6 +467,13 @@
         will-change: transform;
       }
       .sidebar.expanded { transform: translateY(0); }
+      .sidebar.half { transform: translateY(31vh); }
+      /* 터치 타깃 확대 */
+      .star { font-size: 22px; padding: 3px; }
+      .tag-chip { padding: 8px 14px; }
+      .filter-btn { padding: 8px 16px; }
+      .iw-sub-btn { padding: 10px 6px; font-size: 12px; }
+      .iw-move-btn, .iw-del-btn { padding: 10px 6px; }
       .sheet-handle {
         display: block; width: 140px; margin: 0 auto; padding: 10px 0 6px;
         cursor: pointer;
@@ -420,12 +494,16 @@
       <span id="count-label">숙대 · 서울역 · 남대문 일대</span>
     </div>
     <div class="header-right">
-      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="다크모드" aria-label="다크모드 전환">🌙</button>
-      <button class="nick-btn" id="nick-btn" onclick="openNicknameModal()" aria-label="닉네임 변경">👤 …</button>
       <button class="rec-btn" onclick="openRecommendModal()">🎲 추천</button>
       <button class="add-btn" onclick="openAddModal()">＋ 맛집 추가</button>
+      <button class="icon-btn" id="settings-btn" onclick="toggleMenu()" aria-label="설정 메뉴" aria-haspopup="true">⚙️</button>
     </div>
   </header>
+
+  <div class="menu-pop" id="menu-pop">
+    <button id="theme-btn" onclick="toggleTheme()" aria-label="다크모드 전환">🌙 다크 모드</button>
+    <button id="nick-btn" onclick="openNicknameModal(); toggleMenu(false);" aria-label="닉네임 변경">👤 …</button>
+  </div>
 
   <div class="filters">
     <button class="filter-btn all active" onclick="filterMarkers('all')">🗂 전체</button>
@@ -445,19 +523,24 @@
       <div class="sidebar-header" onclick="onSidebarHeaderClick(event)">
         <span>목록 클릭 → 지도에서 확인</span>
         <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
-          <button class="sort-near-btn" id="fav-filter-btn" onclick="toggleFavFilter()" aria-label="찜한 곳만 보기">❤️ 찜만</button>
           <select id="sort-select" onchange="onSortChange(this.value)" aria-label="목록 정렬">
-            <option value="default">기본순</option>
+            <option value="default">↕ 기본순</option>
             <option value="dist">📍 가까운 순</option>
             <option value="rating">⭐ 별점순</option>
-            <option value="name">가나다순</option>
+            <option value="name">🔤 가나다순</option>
           </select>
         </div>
       </div>
       <div class="list" id="list"></div>
+      <div id="empty-state" style="display:none;">
+        <div style="font-size:30px;">🔍</div>
+        <div>조건에 맞는 맛집이 없어요</div>
+        <button onclick="resetFilters()">필터 초기화</button>
+      </div>
     </div>
     <div class="map-wrap">
       <div id="map" style="width:100%;height:100%;"></div>
+      <div id="loading"><div class="loading-bowl">🍜</div><div>맛집 불러오는 중…</div></div>
       <div id="pick-banner">
         <span id="pick-banner-text"></span>
         &nbsp;
@@ -469,42 +552,66 @@
   </div>
 </div>
 
-<!-- 추가 모달 -->
+<!-- 추가 모달 (2단계: 정보 입력 → 위치 선택) -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
-    <h2>🍽 맛집 추가</h2>
-    <div class="form-row">
-      <label>매장명 *</label>
-      <input id="f-name" placeholder="예) 후암 쌀국수" />
+    <h2 id="add-title">🍽 맛집 추가 <span class="step-badge" id="add-step-badge">1/2</span></h2>
+    <div id="add-step1">
+      <div class="form-row">
+        <label>매장명 *</label>
+        <input id="f-name" placeholder="예) 후암 쌀국수" />
+      </div>
+      <div class="form-row">
+        <label>카테고리 *</label>
+        <select id="f-cat">
+          <option value="noodle">🍜 면류</option>
+          <option value="rice">🍚 밥류+a</option>
+          <option value="etc">🎪 기타</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>메뉴 및 금액</label>
+        <input id="f-menu" placeholder="예) 소고기 쌀국수 9,500원" />
+      </div>
+      <div class="form-row">
+        <label>코멘트</label>
+        <textarea id="f-comment" placeholder="맛, 위치, 팁 등 자유롭게"></textarea>
+      </div>
+      <div class="form-row">
+        <label>태그</label>
+        <div class="tag-toggles" id="f-tags"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeAddModal()">취소</button>
+        <button class="btn-submit" onclick="nextAddStep()">다음: 위치 선택 →</button>
+      </div>
     </div>
-    <div class="form-row">
-      <label>카테고리 *</label>
-      <select id="f-cat">
-        <option value="noodle">🍜 면류</option>
-        <option value="rice">🍚 밥류+a</option>
-        <option value="etc">🎪 기타</option>
-      </select>
+    <div id="add-step2" style="display:none;">
+      <div class="form-row">
+        <label>위치 선택 *</label>
+        <button class="map-pick-btn" id="pick-btn" onclick="startPicking()">🗺 핀 드래그로 위치 선택</button>
+        <div class="form-hint" id="pick-hint">버튼을 누르면 지도에 드래그 핀이 생깁니다</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="prevAddStep()">← 이전</button>
+        <button class="btn-submit" onclick="submitAdd()">추가하기</button>
+      </div>
     </div>
+  </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div class="modal-overlay" id="del-overlay">
+  <div class="modal">
+    <h2>🗑 맛집 삭제</h2>
+    <p class="sub">모든 사용자에게서 삭제됩니다.<br>확인을 위해 매장명을 그대로 입력해주세요.</p>
     <div class="form-row">
-      <label>메뉴 및 금액</label>
-      <input id="f-menu" placeholder="예) 소고기 쌀국수 9,500원" />
-    </div>
-    <div class="form-row">
-      <label>코멘트</label>
-      <textarea id="f-comment" placeholder="맛, 위치, 팁 등 자유롭게"></textarea>
-    </div>
-    <div class="form-row">
-      <label>태그</label>
-      <div class="tag-toggles" id="f-tags"></div>
-    </div>
-    <div class="form-row">
-      <label>위치 선택 *</label>
-      <button class="map-pick-btn" id="pick-btn" onclick="startPicking()">🗺 핀 드래그로 위치 선택</button>
-      <div class="form-hint" id="pick-hint">버튼을 누르면 지도에 드래그 핀이 생깁니다</div>
+      <label>매장명: <b id="del-name"></b></label>
+      <input id="del-input" oninput="onDelInput()" placeholder="매장명 입력" />
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeAddModal()">취소</button>
-      <button class="btn-submit" onclick="submitAdd()">추가하기</button>
+      <button class="btn-cancel" onclick="cancelDelete()">취소</button>
+      <button class="btn-submit" id="del-confirm" onclick="confirmDelete()" disabled style="opacity:.4;background:var(--danger);">삭제</button>
     </div>
   </div>
 </div>
@@ -550,6 +657,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="nick-cancel" onclick="closeNicknameModal()">취소</button>
+      <button class="btn-cancel" id="nick-skip" onclick="skipNickname()">익명으로 시작</button>
       <button class="btn-submit" onclick="saveNickname()">저장</button>
     </div>
   </div>
@@ -671,6 +779,7 @@ naver.maps.Event.addListener(map, 'click', () => {
   if (!movingId && !isDraggingNew) {
     if (openIW) { openIW.close(); openIW = null; openPlaceId = null; }
     if (activeListItem) { activeListItem.classList.remove('active'); activeListItem = null; }
+    clearActiveMarker();
   }
 });
 
@@ -728,8 +837,9 @@ function buildIwContent(p) {
         <button class="iw-sub-btn" data-action="nav" data-id="${pid}">🧭 길찾기</button>
         <button class="iw-sub-btn" data-action="share" data-id="${pid}">🔗 공유</button>
         <button class="iw-sub-btn ${favs.has(p.id)?'fav-on':''}" data-action="fav" data-id="${pid}" aria-label="찜 토글">${favs.has(p.id)?'❤️ 찜함':'🤍 찜'}</button>
+        <button class="iw-sub-btn" data-action="more" data-id="${pid}" aria-label="더보기" style="flex:0 0 34px;">⋯</button>
       </div>
-      <div class="iw-actions" style="border-top:none;padding-top:0;">
+      <div class="iw-actions iw-more" style="display:none;border-top:none;padding-top:0;">
         <button class="iw-move-btn" data-action="move" data-id="${pid}">📍 위치 수정</button>
         <button class="iw-del-btn" data-action="del" data-id="${pid}">🗑 삭제</button>
       </div>
@@ -807,11 +917,13 @@ function removePlaceFromUI(id) {
   const item = listItemMap[id];
   if (item) { item.remove(); delete listItemMap[id]; }
   if (openPlaceId === id) { openIW = null; openPlaceId = null; }
+  if (activeMarkerId === id) activeMarkerId = null;
 }
 
 function renderAll() {
   Object.values(markerMap).forEach(({ marker, iw }) => { iw.close(); marker.setMap(null); });
   for (const k in markerMap) delete markerMap[k];
+  activeMarkerId = null;   // 마커 재생성 → openInfo 재호출 시 다시 강조
   for (const k in listItemMap) delete listItemMap[k];
   document.getElementById('list').innerHTML = '';
 
@@ -836,9 +948,42 @@ function updateCountLabel() {
 // ─────────────────────────────────────────────
 // 인포윈도우 열기
 // ─────────────────────────────────────────────
+// 선택된 마커 강조
+let activeMarkerId = null;
+function setMarkerActive(id, on) {
+  const entry = markerMap[id];
+  if (!entry) return;
+  const el = entry.marker.getElement();
+  if (el) {
+    el.style.transition = 'transform .15s';
+    el.style.transform = on ? 'scale(1.25)' : '';
+    el.style.filter = on ? 'drop-shadow(0 3px 8px rgba(0,0,0,.45))' : '';
+  }
+  if (entry.marker.setZIndex) entry.marker.setZIndex(on ? 300 : 100);
+}
+function clearActiveMarker() {
+  if (activeMarkerId) { setMarkerActive(activeMarkerId, false); activeMarkerId = null; }
+}
+
+// 모바일에선 시트에 가리지 않도록 마커를 화면 중앙보다 약간 위로 팬
+function panToPlace(pos) {
+  const mobile = window.matchMedia('(max-width: 640px)').matches;
+  try {
+    const proj = map.getProjection();
+    if (mobile && proj && proj.fromCoordToOffset && proj.fromOffsetToCoord) {
+      const off = proj.fromCoordToOffset(pos);
+      off.y += 48;
+      map.panTo(proj.fromOffsetToCoord(off));
+      return;
+    }
+  } catch (e) {}
+  map.panTo(pos);
+}
+
 function openInfo(id) {
   if (openIW) openIW.close();
   if (activeListItem) activeListItem.classList.remove('active');
+  clearActiveMarker();
 
   const entry = markerMap[id];
   if (!entry) return;
@@ -846,7 +991,9 @@ function openInfo(id) {
   iw.open(map, marker);
   openIW = iw;
   openPlaceId = id;
-  map.panTo(marker.getPosition());
+  setMarkerActive(id, true);
+  activeMarkerId = id;
+  panToPlace(marker.getPosition());
 
   const mobile = window.matchMedia('(max-width: 640px)').matches;
   const item = listItemMap[id];
@@ -860,7 +1007,7 @@ function openInfo(id) {
   suppressMapClickUntil = Date.now() + 700;
 
   // 모바일: 탭 이벤트가 완전히 끝난 뒤 시트를 접어야 클릭이 지도로 새지 않음
-  if (mobile) setTimeout(() => document.getElementById('sidebar').classList.remove('expanded'), 250);
+  if (mobile) setTimeout(() => document.getElementById('sidebar').classList.remove('expanded', 'half'), 250);
 }
 
 // ─────────────────────────────────────────────
@@ -908,19 +1055,43 @@ function refreshRatingUI(id) {
 // ─────────────────────────────────────────────
 // 삭제
 // ─────────────────────────────────────────────
-async function deletePlace(id) {
+let pendingDeleteId = null;
+
+function deletePlace(id) {
   if (readOnly) { toast('삭제는 로그인(익명) 활성화 후 가능해요'); return; }
   const p = places.find(x => x.id === id);
   if (!p) return;
-  // 모두의 데이터가 지워지므로 매장명 입력으로 이중 확인
-  const typed = prompt(`모든 사용자에게서 삭제됩니다.\n정말 삭제하려면 매장명을 그대로 입력하세요:\n\n${p.name}`);
-  if (typed === null) return;
-  if (typed.trim() !== p.name) { toast('매장명이 일치하지 않아 취소했어요'); return; }
+  pendingDeleteId = id;
+  document.getElementById('del-name').textContent = p.name;
+  const input = document.getElementById('del-input');
+  input.value = '';
+  onDelInput();
+  document.getElementById('del-overlay').classList.add('open');
+  setTimeout(() => input.focus(), 100);
+}
+
+function onDelInput() {
+  const p = places.find(x => x.id === pendingDeleteId);
+  const match = !!p && document.getElementById('del-input').value.trim() === p.name;
+  const b = document.getElementById('del-confirm');
+  b.disabled = !match;
+  b.style.opacity = match ? '1' : '.4';
+}
+
+function cancelDelete() {
+  pendingDeleteId = null;
+  document.getElementById('del-overlay').classList.remove('open');
+}
+
+async function confirmDelete() {
+  const id = pendingDeleteId;
+  if (!id) return;
+  cancelDelete();
   const { error } = await supabase.from('places').delete().eq('id', id);
   if (error) { toast('삭제 실패'); console.error(error); return; }
   places = places.filter(p => p.id !== id);
   removePlaceFromUI(id);
-  updateCountLabel();
+  applyFilter();
   toast('삭제됨');
 }
 
@@ -932,6 +1103,7 @@ let movingId = null;
 function startMovePlace(id) {
   if (readOnly) { toast('위치 수정은 로그인(익명) 활성화 후 가능해요'); return; }
   if (openIW) { openIW.close(); openIW = null; openPlaceId = null; }
+  clearActiveMarker();
   movingId = id;
   const place = places.find(p => p.id === id);
   if (!place) return;
@@ -1035,32 +1207,54 @@ let searchTimer = null;
 function onSearchInput() {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(applyFilter, 150);
+  // 모바일: 검색하면 결과 목록이 보이도록 시트를 반쯤 열기
+  if (window.matchMedia('(max-width: 640px)').matches) {
+    const sb = document.getElementById('sidebar');
+    const q = document.getElementById('search-input').value.trim();
+    if (q && !sb.classList.contains('expanded') && !sb.classList.contains('half')) sb.classList.add('half');
+  }
 }
 
 function applyFilter() {
   const query = document.getElementById('search-input').value.trim().toLowerCase();
+  let visibleCount = 0;
   places.forEach(p => {
     const show = matchesFilter(p, query);
+    if (show) visibleCount++;
     markerMap[p.id]?.marker.setVisible(show);
     const item = listItemMap[p.id];
     if (item) item.style.display = show ? '' : 'none';
   });
+  // 결과 없음 안내
+  document.getElementById('empty-state').style.display =
+    (visibleCount === 0 && places.length > 0) ? '' : 'none';
   // 열린 인포윈도우는 필터 결과에서 빠졌을 때만 닫음 (실시간 갱신 등으로 닫히지 않게)
   if (openPlaceId) {
     const op = places.find(x => x.id === openPlaceId);
     if (!op || !matchesFilter(op, query)) {
       if (openIW) openIW.close();
       openIW = null; openPlaceId = null;
+      clearActiveMarker();
     }
   }
   updateCountLabel();
 }
 
+function resetFilters() {
+  activeTagFilter = null;
+  favOnly = false;
+  document.getElementById('search-input').value = '';
+  renderTagFilters();
+  filterMarkers('all');   // applyFilter 포함
+}
+
 function renderTagFilters() {
   const wrap = document.getElementById('tag-filters');
-  wrap.innerHTML = TAGS.map(t =>
-    `<button class="tag-chip ${activeTagFilter===t.id?'active':''}" onclick="filterByTag('${t.id}')">${t.label}</button>`
-  ).join('');
+  wrap.innerHTML =
+    `<button class="tag-chip fav ${favOnly?'active':''}" onclick="toggleFavFilter()" aria-label="찜한 곳만 보기">❤️ 찜</button>` +
+    TAGS.map(t =>
+      `<button class="tag-chip ${activeTagFilter===t.id?'active':''}" onclick="filterByTag('${t.id}')">${t.label}</button>`
+    ).join('');
 }
 
 // ─────────────────────────────────────────────
@@ -1110,9 +1304,23 @@ function toggleTag(tagId) {
   renderTagToggles();
 }
 
+function setAddStep(step) {
+  document.getElementById('add-step1').style.display = step === 1 ? '' : 'none';
+  document.getElementById('add-step2').style.display = step === 2 ? '' : 'none';
+  document.getElementById('add-step-badge').textContent = step + '/2';
+}
+
+function nextAddStep() {
+  if (!document.getElementById('f-name').value.trim()) { alert('매장명을 입력해주세요.'); return; }
+  setAddStep(2);
+}
+
+function prevAddStep() { setAddStep(1); }
+
 function openAddModal() {
   selectedTags = [];
   renderTagToggles();
+  setAddStep(1);
   document.getElementById('modal-overlay').classList.add('open');
 }
 
@@ -1127,6 +1335,7 @@ function closeAddModal() {
   document.getElementById('pick-hint').textContent = '버튼을 누르면 지도에 드래그 핀이 생깁니다';
   document.getElementById('pick-btn').textContent = '🗺 핀 드래그로 위치 선택';
   document.getElementById('pick-btn').classList.remove('picking');
+  setAddStep(1);
 }
 
 function startPicking() {
@@ -1201,6 +1410,7 @@ function updateNickBtn() {
 function openNicknameModal() {
   document.getElementById('f-nick').value = nickname || '';
   document.getElementById('nick-cancel').style.display = nickname ? '' : 'none';
+  document.getElementById('nick-skip').style.display = nickname ? 'none' : '';
   document.getElementById('nick-overlay').classList.add('open');
   setTimeout(() => document.getElementById('f-nick').focus(), 100);
 }
@@ -1208,6 +1418,12 @@ function openNicknameModal() {
 function closeNicknameModal() {
   if (!nickname) return;
   document.getElementById('nick-overlay').classList.remove('open');
+}
+
+function skipNickname() {
+  localStorage.setItem('matzip_nick_skip', '1');
+  document.getElementById('nick-overlay').classList.remove('open');
+  toast('익명으로 시작해요 (⚙️ 메뉴에서 언제든 설정 가능)');
 }
 
 function saveNickname() {
@@ -1320,6 +1536,7 @@ function spinRoulette(pool, picked) {
         if (token !== spinToken) return;
         recommendedId = picked.id;
         renderRecResult(picked);
+        celebrate(resultEl);
         setGotoEnabled(true);
         isSpinning = false;
       }, 240);
@@ -1358,6 +1575,21 @@ function renderRecResult(p) {
 
 function respinRoulette() {
   if (!isSpinning) recommendByCat(lastRecCat);
+}
+
+// 당첨 컨페티 + 햅틱
+function celebrate(container) {
+  if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+  const colors = ['#e85d26', '#f6a623', '#2c7a4b', '#7b5ea7', '#2563eb'];
+  for (let i = 0; i < 18; i++) {
+    const s = document.createElement('span');
+    s.className = 'confetti';
+    s.style.left = (8 + Math.random() * 84) + '%';
+    s.style.background = colors[i % colors.length];
+    s.style.animationDelay = (Math.random() * .25) + 's';
+    container.appendChild(s);
+    setTimeout(() => s.remove(), 1600);
+  }
 }
 
 function gotoRecommend() {
@@ -1401,7 +1633,7 @@ function toggleFav(id) {
 
 function toggleFavFilter() {
   favOnly = !favOnly;
-  document.getElementById('fav-filter-btn').classList.toggle('on', favOnly);
+  renderTagFilters();
   applyFilter();
 }
 
@@ -1419,6 +1651,10 @@ function handleActionClick(e) {
   else if (action === 'nav') openDirections(id);
   else if (action === 'share') copyShareLink(id);
   else if (action === 'fav') toggleFav(id);
+  else if (action === 'more') {
+    const more = btn.closest('.iw')?.querySelector('.iw-more');
+    if (more) more.style.display = more.style.display === 'none' ? 'flex' : 'none';
+  }
 }
 function handleStarKeydown(e) {
   if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -1447,19 +1683,83 @@ function applyTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
   localStorage.setItem('matzip_theme', t);
   const b = document.getElementById('theme-btn');
-  if (b) b.textContent = t === 'dark' ? '☀️' : '🌙';
+  if (b) b.textContent = t === 'dark' ? '☀️ 라이트 모드' : '🌙 다크 모드';
 }
+
+// 설정(⚙️) 메뉴
+function toggleMenu(force) {
+  const m = document.getElementById('menu-pop');
+  const open = typeof force === 'boolean' ? force : !m.classList.contains('open');
+  m.classList.toggle('open', open);
+}
+document.addEventListener('click', e => {
+  const m = document.getElementById('menu-pop');
+  if (m.classList.contains('open') && !e.target.closest('#menu-pop, #settings-btn')) m.classList.remove('open');
+});
 function toggleTheme() {
   const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   applyTheme(cur === 'dark' ? 'light' : 'dark');
 }
+let suppressSheetClickUntil = 0;   // 드래그 직후 탭 토글 방지
+
 function toggleSheet() {
-  document.getElementById('sidebar').classList.toggle('expanded');
+  if (Date.now() < suppressSheetClickUntil) return;
+  const sb = document.getElementById('sidebar');
+  if (sb.classList.contains('expanded') || sb.classList.contains('half')) sb.classList.remove('expanded', 'half');
+  else sb.classList.add('expanded');
 }
 function onSidebarHeaderClick(e) {
   // 모바일에서 헤더(정렬버튼 제외) 클릭 시 시트 토글
   if (window.matchMedia('(max-width: 640px)').matches) toggleSheet();
 }
+
+// 시트 드래그 제스처: 손잡이/헤더를 끌어서 접힘·반열림·전체열림 스냅
+(function initSheetDrag() {
+  const sb = document.getElementById('sidebar');
+  let startY = null, startPos = 0, curY = 0, moved = false, collapsedY = 0, halfY = 0;
+  function positions() {
+    const h = sb.offsetHeight;
+    collapsedY = h - 96;
+    halfY = Math.round(h * 0.5);
+  }
+  function currentY() {
+    if (sb.classList.contains('expanded')) return 0;
+    if (sb.classList.contains('half')) return halfY;
+    return collapsedY;
+  }
+  function onStart(e) {
+    if (!window.matchMedia('(max-width: 640px)').matches) return;
+    positions();
+    startY = e.touches[0].clientY;
+    startPos = curY = currentY();
+    moved = false;
+    sb.style.transition = 'none';
+  }
+  function onMove(e) {
+    if (startY === null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > 8) moved = true;
+    curY = Math.min(collapsedY, Math.max(0, startPos + dy));
+    sb.style.transform = `translateY(${curY}px)`;
+  }
+  function onEnd() {
+    if (startY === null) return;
+    sb.style.transition = '';
+    sb.style.transform = '';
+    sb.classList.remove('expanded', 'half');
+    const dFull = Math.abs(curY), dHalf = Math.abs(curY - halfY), dCol = Math.abs(curY - collapsedY);
+    if (dFull <= dHalf && dFull <= dCol) sb.classList.add('expanded');
+    else if (dHalf <= dCol) sb.classList.add('half');
+    startY = null;
+    if (moved) suppressSheetClickUntil = Date.now() + 400;
+  }
+  [document.querySelector('.sheet-handle'), document.querySelector('.sidebar-header')].forEach(g => {
+    if (!g) return;
+    g.addEventListener('touchstart', onStart, { passive: true });
+    g.addEventListener('touchmove', onMove, { passive: true });
+    g.addEventListener('touchend', onEnd);
+  });
+})();
 
 // ─────────────────────────────────────────────
 // 데이터 로드
@@ -1553,13 +1853,14 @@ async function init() {
     '<option value="">🏷 태그 무관 (전체)</option>' + TAGS.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
   applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
 
-  if (!nickname) openNicknameModal();
+  if (!nickname && !localStorage.getItem('matzip_nick_skip')) openNicknameModal();
 
   try { await signIn(); }
   catch (e) { console.warn('익명 로그인 실패 — 읽기 전용 모드', e); readOnly = true; toast('읽기 전용 모드 (익명 로그인 비활성)'); }
 
   await Promise.all([loadPlaces(), loadSummaries(), loadMyRatings()]);
   renderAll();
+  document.getElementById('loading').style.display = 'none';
   subscribeRealtime();
 
   // 공유 딥링크 (?place=id)
@@ -1630,11 +1931,12 @@ async function registerSW() {
 // ─────────────────────────────────────────────
 Object.assign(window, {
   filterMarkers, filterByTag, onSearchInput, openInfo, setRating, deletePlace,
-  startMovePlace, confirmDrag, cancelDrag, applyFilter,
-  openAddModal, closeAddModal, startPicking, submitAdd, toggleTag,
-  openNicknameModal, closeNicknameModal, saveNickname,
+  startMovePlace, confirmDrag, cancelDrag, applyFilter, resetFilters,
+  openAddModal, closeAddModal, nextAddStep, prevAddStep, startPicking, submitAdd, toggleTag,
+  openNicknameModal, closeNicknameModal, saveNickname, skipNickname,
   openRecommendModal, closeRecommendModal, recommendByCat, gotoRecommend, respinRoulette,
-  toggleTheme, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter,
+  toggleTheme, toggleMenu, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter,
+  onDelInput, cancelDelete, confirmDelete,
   applyUpdate, dismissUpdate
 });
 
@@ -1643,6 +1945,7 @@ window.__matzip = {
   get places(){ return places; },
   get summaries(){ return summaries; },
   get openPlaceId(){ return openPlaceId; },
+  get activeMarkerId(){ return activeMarkerId; },
   get favs(){ return [...favs]; },
   buildIwContent, buildIwElement, onPlacesChange, onRatingsChange, esc, showUpdateBanner
 };
