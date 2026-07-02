@@ -1,4 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="96" fill="#e85d26"/>
-  <text x="50%" y="50%" dy="0.08em" font-size="300" text-anchor="middle" dominant-baseline="middle">🍜</text>
+  <!-- 김 (steam) -->
+  <g stroke="#fff" stroke-width="18" stroke-linecap="round" fill="none" opacity=".8">
+    <path d="M208 92c0 24-18 24-18 48s18 24 18 48"/>
+    <path d="M304 92c0 24-18 24-18 48s18 24 18 48"/>
+  </g>
+  <!-- 젓가락 -->
+  <g stroke="#7b4a1e" stroke-width="16" stroke-linecap="round">
+    <path d="M310 118L398 282"/>
+    <path d="M356 102L424 262"/>
+  </g>
+  <!-- 그릇 -->
+  <path d="M88 256h336c0 97-75 168-168 168S88 353 88 256z" fill="#fff"/>
+  <!-- 면발 -->
+  <g stroke="#f6a623" stroke-width="14" stroke-linecap="round" fill="none">
+    <path d="M124 282c24 20 46 20 70 0s46-20 70 0 46 20 70 0 40-16 54 0"/>
+    <path d="M136 322c22 18 42 18 64 0s42-18 64 0 42 18 64 0 34-14 48 0"/>
+  </g>
 </svg>

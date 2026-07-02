@@ -18,7 +18,7 @@
   <!-- PWA -->
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#e85d26" />
-  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
 
   <!-- ✅ 네이버 지도 (Client ID) -->
   <script type="text/javascript"
@@ -209,6 +209,20 @@
     }
     .sort-near-btn:hover { border-color: var(--ink); }
     .sort-near-btn.on { background: var(--move); color: #fff; border-color: var(--move); font-weight: 700; }
+    #fav-filter-btn.on { background: #e0447c; border-color: #e0447c; }
+    #sort-select {
+      background: var(--soft); border: 1.5px solid var(--border); color: var(--muted);
+      border-radius: 14px; padding: 4px 8px; font-size: 11px; font-family: inherit;
+      cursor: pointer; outline: none;
+    }
+    .item-fav { font-size: 10px; }
+    .iw-sub-btn {
+      flex: 1; padding: 6px 4px; border: 1.5px solid var(--border); border-radius: 6px;
+      background: var(--soft); color: var(--ink); font-size: 11px;
+      font-family: inherit; cursor: pointer; transition: filter .1s; white-space: nowrap;
+    }
+    .iw-sub-btn:hover { filter: brightness(.95); }
+    .iw-sub-btn.fav-on { border-color: #e0447c; color: #e0447c; background: #fff0f5; }
     .list { overflow-y: auto; flex: 1; }
     .list-item {
       display: flex; align-items: flex-start; gap: 10px;
@@ -376,8 +390,8 @@
       <span id="count-label">숙대 · 서울역 · 남대문 일대</span>
     </div>
     <div class="header-right">
-      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="다크모드">🌙</button>
-      <button class="nick-btn" id="nick-btn" onclick="openNicknameModal()">👤 …</button>
+      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="다크모드" aria-label="다크모드 전환">🌙</button>
+      <button class="nick-btn" id="nick-btn" onclick="openNicknameModal()" aria-label="닉네임 변경">👤 …</button>
       <button class="rec-btn" onclick="openRecommendModal()">🎲 추천</button>
       <button class="add-btn" onclick="openAddModal()">＋ 맛집 추가</button>
     </div>
@@ -389,7 +403,7 @@
     <button class="filter-btn rice"   onclick="filterMarkers('rice')">🍚 밥류+a</button>
     <button class="filter-btn etc"    onclick="filterMarkers('etc')">🎪 기타</button>
     <div class="search-wrap">
-      <input id="search-input" type="text" placeholder="매장·메뉴 검색" oninput="onSearchInput()" />
+      <input id="search-input" type="text" placeholder="매장·메뉴·코멘트 검색" aria-label="맛집 검색" oninput="onSearchInput()" />
     </div>
   </div>
 
@@ -400,7 +414,15 @@
       <div class="sheet-handle" onclick="toggleSheet()"></div>
       <div class="sidebar-header" onclick="onSidebarHeaderClick(event)">
         <span>목록 클릭 → 지도에서 확인</span>
-        <button class="sort-near-btn" id="sort-near-btn" onclick="toggleNearestSort(); event.stopPropagation();">📍 가까운 순</button>
+        <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
+          <button class="sort-near-btn" id="fav-filter-btn" onclick="toggleFavFilter()" aria-label="찜한 곳만 보기">❤️ 찜만</button>
+          <select id="sort-select" onchange="onSortChange(this.value)" aria-label="목록 정렬">
+            <option value="default">기본순</option>
+            <option value="dist">📍 가까운 순</option>
+            <option value="rating">⭐ 별점순</option>
+            <option value="name">가나다순</option>
+          </select>
+        </div>
       </div>
       <div class="list" id="list"></div>
     </div>
@@ -468,6 +490,7 @@
       <button class="rec-cat"        data-cat="rice"   onclick="recommendByCat('rice')">🍚 밥류+a</button>
       <button class="rec-cat"        data-cat="etc"    onclick="recommendByCat('etc')">🎪 기타</button>
     </div>
+    <select id="rec-tag" aria-label="태그 조건" style="width:100%;margin-bottom:10px;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;font-size:12px;"></select>
     <label class="rec-near"><input type="checkbox" id="rec-near" /> 📍 내 주변만 (위치 허용 필요)</label>
     <div class="rec-result" id="rec-result">
       <div class="rec-empty">위 카테고리를 선택하면<br>룰렛이 주르르륵 돌아갑니다 🎰</div>
@@ -545,7 +568,10 @@ const markerMap = {};    // id → { marker, iw }
 const listItemMap = {};  // id → element
 
 let myLoc = null;          // { lat, lng }
-let sortByDistance = false;
+let sortMode = 'default';  // default | dist | rating | name
+let favs = new Set((() => { try { return JSON.parse(localStorage.getItem('matzip_favs') || '[]'); } catch { return []; } })());
+let favOnly = false;
+let lastRecCat = 'all';
 
 // ─────────────────────────────────────────────
 // 공용 헬퍼
@@ -572,6 +598,23 @@ function fmtDist(m) { return m >= 1000 ? (m/1000).toFixed(1) + 'km' : Math.round
 function computeDistances() {
   if (!myLoc) return;
   places.forEach(p => { p._dist = haversine(myLoc.lat, myLoc.lng, p.lat, p.lng); });
+}
+
+function sortedPlaces() {
+  const arr = [...places];
+  if (sortMode === 'dist' && myLoc) arr.sort((a, b) => (a._dist ?? 1e12) - (b._dist ?? 1e12));
+  else if (sortMode === 'rating') arr.sort((a, b) => {
+    const sa = summaries[a.id], sb = summaries[b.id];
+    return ((sb?.average) || 0) - ((sa?.average) || 0) || ((sb?.count) || 0) - ((sa?.count) || 0);
+  });
+  else if (sortMode === 'name') arr.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  return arr;
+}
+
+// 증분 추가/수정 후 현재 정렬 기준대로 목록 DOM 재배치
+function resortList() {
+  const listEl = document.getElementById('list');
+  sortedPlaces().forEach(p => { const it = listItemMap[p.id]; if (it) listEl.appendChild(it); });
 }
 
 // ─────────────────────────────────────────────
@@ -612,8 +655,10 @@ function buildIwContent(p) {
   const cnt = sum ? sum.count : 0;
   const mine = myRatings[p.id] || 0;
 
+  // id도 속성에 들어가므로 반드시 이스케이프 (onclick 문자열 주입 방지 → 이벤트 위임 사용)
+  const pid = esc(p.id);
   const myStars = [1,2,3,4,5].map(n =>
-    `<span class="star ${n<=mine?'on':''}" onclick="setRating('${p.id}',${n})" data-id="${p.id}" data-n="${n}">★</span>`
+    `<span class="star ${n<=mine?'on':''}" data-id="${pid}" data-n="${n}" role="button" tabindex="0" aria-label="${n}점 주기">★</span>`
   ).join('');
 
   const tagBadges = (p.tags && p.tags.length)
@@ -632,15 +677,20 @@ function buildIwContent(p) {
       </div>
       <div class="iw-myrate">
         <span class="iw-myrate-label">내 평가:</span>
-        <div class="star-row" id="stars-${p.id}">${myStars}</div>
+        <div class="star-row" id="stars-${pid}">${myStars}</div>
       </div>
       <div class="iw-menu">${esc(p.menu || '')}</div>
       ${tagBadges}
       ${p.comment ? `<div class="iw-comment">💬 ${esc(p.comment)}</div>` : ''}
       <div class="iw-author">추가한 사람: ${esc(p.added_by || '익명')}</div>
       <div class="iw-actions">
-        <button class="iw-move-btn" onclick="startMovePlace('${p.id}')">📍 위치 수정</button>
-        <button class="iw-del-btn" onclick="deletePlace('${p.id}')">🗑 삭제</button>
+        <button class="iw-sub-btn" data-action="nav" data-id="${pid}">🧭 길찾기</button>
+        <button class="iw-sub-btn" data-action="share" data-id="${pid}">🔗 공유</button>
+        <button class="iw-sub-btn ${favs.has(p.id)?'fav-on':''}" data-action="fav" data-id="${pid}" aria-label="찜 토글">${favs.has(p.id)?'❤️ 찜함':'🤍 찜'}</button>
+      </div>
+      <div class="iw-actions" style="border-top:none;padding-top:0;">
+        <button class="iw-move-btn" data-action="move" data-id="${pid}">📍 위치 수정</button>
+        <button class="iw-del-btn" data-action="del" data-id="${pid}">🗑 삭제</button>
       </div>
     </div>`;
 }
@@ -664,6 +714,7 @@ function listItemInner(p) {
       <div class="item-menu">${esc(p.menu || '')}</div>
       <div class="item-meta">
         <span class="item-tag ${p.cat}">${catLabel(p.cat)}</span>
+        ${favs.has(p.id) ? '<span class="item-fav">❤️</span>' : ''}
         ${sum && sum.count>0 ? `<span class="item-stars">${avgStars(sum.average)}</span><span class="item-tagbadge">${sum.average}</span>` : ''}
         ${distHtml}
         ${tagBadgesHtml}
@@ -724,10 +775,7 @@ function renderAll() {
   document.getElementById('list').innerHTML = '';
 
   if (myLoc) computeDistances();
-  const ordered = (sortByDistance && myLoc)
-    ? [...places].sort((a, b) => (a._dist ?? 1e12) - (b._dist ?? 1e12))
-    : places;
-  ordered.forEach(addPlaceToUI);
+  sortedPlaces().forEach(addPlaceToUI);
 
   applyFilter();
   updateCountLabel();
@@ -761,6 +809,10 @@ function openInfo(id) {
 
   const item = listItemMap[id];
   if (item) { item.classList.add('active'); item.scrollIntoView({ block:'nearest' }); activeListItem = item; }
+
+  // 모바일: 바텀시트가 인포윈도우를 가리지 않도록 자동 접기
+  if (window.matchMedia('(max-width: 640px)').matches)
+    document.getElementById('sidebar').classList.remove('expanded');
 }
 
 // ─────────────────────────────────────────────
@@ -810,7 +862,12 @@ function refreshRatingUI(id) {
 // ─────────────────────────────────────────────
 async function deletePlace(id) {
   if (readOnly) { toast('삭제는 로그인(익명) 활성화 후 가능해요'); return; }
-  if (!confirm('이 맛집을 삭제할까요?')) return;
+  const p = places.find(x => x.id === id);
+  if (!p) return;
+  // 모두의 데이터가 지워지므로 매장명 입력으로 이중 확인
+  const typed = prompt(`모든 사용자에게서 삭제됩니다.\n정말 삭제하려면 매장명을 그대로 입력하세요:\n\n${p.name}`);
+  if (typed === null) return;
+  if (typed.trim() !== p.name) { toast('매장명이 일치하지 않아 취소했어요'); return; }
   const { error } = await supabase.from('places').delete().eq('id', id);
   if (error) { toast('삭제 실패'); console.error(error); return; }
   places = places.filter(p => p.id !== id);
@@ -903,8 +960,13 @@ function stopMove() {
 function matchesFilter(p, query) {
   const matchCat  = activeFilter === 'all' || p.cat === activeFilter;
   const matchTag  = !activeTagFilter || (p.tags || []).includes(activeTagFilter);
-  const matchName = !query || p.name.toLowerCase().includes(query) || (p.menu||'').toLowerCase().includes(query);
-  return matchCat && matchTag && matchName;
+  const matchFav  = !favOnly || favs.has(p.id);
+  const matchName = !query
+    || p.name.toLowerCase().includes(query)
+    || (p.menu || '').toLowerCase().includes(query)
+    || (p.comment || '').toLowerCase().includes(query)
+    || (p.tags || []).some(t => (TAG_LABEL[t] || t).toLowerCase().includes(query));
+  return matchCat && matchTag && matchFav && matchName;
 }
 
 function filterMarkers(cat) {
@@ -935,7 +997,14 @@ function applyFilter() {
     const item = listItemMap[p.id];
     if (item) item.style.display = show ? '' : 'none';
   });
-  if (openIW) { openIW.close(); openIW = null; openPlaceId = null; }
+  // 열린 인포윈도우는 필터 결과에서 빠졌을 때만 닫음 (실시간 갱신 등으로 닫히지 않게)
+  if (openPlaceId) {
+    const op = places.find(x => x.id === openPlaceId);
+    if (!op || !matchesFilter(op, query)) {
+      if (openIW) openIW.close();
+      openIW = null; openPlaceId = null;
+    }
+  }
   updateCountLabel();
 }
 
@@ -947,17 +1016,10 @@ function renderTagFilters() {
 }
 
 // ─────────────────────────────────────────────
-// 내 위치 기반 정렬
+// 내 위치 / 정렬
 // ─────────────────────────────────────────────
-function updateNearestBtn() {
-  const b = document.getElementById('sort-near-btn');
-  b.classList.toggle('on', sortByDistance);
-  b.textContent = sortByDistance ? '📍 가까운 순 ✓' : '📍 가까운 순';
-}
-
-function ensureMyLocation() {
+function getLocation() {
   return new Promise((resolve, reject) => {
-    if (myLoc) return resolve(myLoc);
     if (!navigator.geolocation) return reject(new Error('no-geo'));
     navigator.geolocation.getCurrentPosition(
       pos => { myLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude }; computeDistances(); resolve(myLoc); },
@@ -966,21 +1028,17 @@ function ensureMyLocation() {
     );
   });
 }
+function ensureMyLocation() { return myLoc ? Promise.resolve(myLoc) : getLocation(); }
 
-async function toggleNearestSort() {
-  if (!sortByDistance) {
+async function onSortChange(mode) {
+  if (mode === 'dist') {
     toast('위치 확인 중…');
-    try { await ensureMyLocation(); }
-    catch { toast('위치 권한이 필요해요'); return; }
-    sortByDistance = true;
-    updateNearestBtn();
-    renderAll();
-    toast('가까운 순으로 정렬됨 📍');
-  } else {
-    sortByDistance = false;
-    updateNearestBtn();
-    renderAll();
+    try { await getLocation(); }   // 토글할 때마다 최신 위치로 갱신
+    catch { toast('위치 권한이 필요해요'); document.getElementById('sort-select').value = sortMode; return; }
   }
+  sortMode = mode;
+  renderAll();
+  if (mode === 'dist') toast('가까운 순으로 정렬됨 📍');
 }
 
 // ─────────────────────────────────────────────
@@ -1078,6 +1136,7 @@ async function submitAdd() {
   upsertLocalPlace(newPlace);
   if (myLoc) computeDistances();
   addPlaceToUI(newPlace);
+  resortList();
   applyFilter();
   closeAddModal();
   setTimeout(() => openInfo(newPlace.id), 300);
@@ -1128,6 +1187,7 @@ function setGotoEnabled(on) {
 function openRecommendModal() {
   spinToken++;
   isSpinning = false;
+  lastRecCat = 'all';
   document.getElementById('rec-result').innerHTML =
     '<div class="rec-empty">위 카테고리를 선택하면<br>룰렛이 주르르륵 돌아갑니다 🎰</div>';
   recommendedId = null;
@@ -1144,9 +1204,14 @@ function closeRecommendModal() {
 
 async function recommendByCat(cat) {
   if (isSpinning) return;
+  lastRecCat = cat;
   document.querySelectorAll('.rec-cat').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
 
   let pool = places.filter(p => cat === 'all' || p.cat === cat);
+
+  // 태그 조건
+  const tagSel = document.getElementById('rec-tag').value;
+  if (tagSel) pool = pool.filter(p => (p.tags || []).includes(tagSel));
 
   // 내 주변만
   if (document.getElementById('rec-near').checked) {
@@ -1239,7 +1304,12 @@ function renderRecResult(p) {
       <div class="rec-menu">${esc(p.menu || '')}</div>
       ${tagsHtml}
       ${p.comment ? `<div class="rec-comment">💬 ${esc(p.comment)}</div>` : ''}
+      <button class="btn-cancel" style="width:100%;margin-top:10px;" onclick="respinRoulette()">🔁 다시 돌리기</button>
     </div>`;
+}
+
+function respinRoulette() {
+  if (!isSpinning) recommendByCat(lastRecCat);
 }
 
 function gotoRecommend() {
@@ -1255,6 +1325,56 @@ function gotoRecommend() {
   closeRecommendModal();
   setTimeout(() => openInfo(id), 250);
 }
+
+// ─────────────────────────────────────────────
+// 길찾기 / 공유 / 찜
+// ─────────────────────────────────────────────
+function openDirections(id) {
+  const p = places.find(x => x.id === id);
+  if (!p) return;
+  const url = `https://map.naver.com/p/directions/-/${p.lng},${p.lat},${encodeURIComponent(p.name)}/-/walk`;
+  window.open(url, '_blank', 'noopener');
+}
+
+async function copyShareLink(id) {
+  const url = `${location.origin}${location.pathname}?place=${encodeURIComponent(id)}`;
+  try { await navigator.clipboard.writeText(url); toast('공유 링크 복사됨 🔗'); }
+  catch { prompt('아래 링크를 복사하세요', url); }
+}
+
+function toggleFav(id) {
+  if (favs.has(id)) favs.delete(id); else favs.add(id);
+  localStorage.setItem('matzip_favs', JSON.stringify([...favs]));
+  const p = places.find(x => x.id === id);
+  if (p) updatePlaceUI(p);
+  if (favOnly) applyFilter();
+  toast(favs.has(id) ? '찜 추가 ❤️' : '찜 해제');
+}
+
+function toggleFavFilter() {
+  favOnly = !favOnly;
+  document.getElementById('fav-filter-btn').classList.toggle('on', favOnly);
+  applyFilter();
+}
+
+// 인포윈도우 등 동적 HTML의 버튼은 이벤트 위임으로 처리 (id를 onclick 문자열에 넣지 않음)
+document.addEventListener('click', e => {
+  const star = e.target.closest('.star[data-id]');
+  if (star) { setRating(star.dataset.id, parseInt(star.dataset.n)); return; }
+  const btn = e.target.closest('[data-action][data-id]');
+  if (!btn) return;
+  const { action, id } = btn.dataset;
+  if (action === 'move') startMovePlace(id);
+  else if (action === 'del') deletePlace(id);
+  else if (action === 'nav') openDirections(id);
+  else if (action === 'share') copyShareLink(id);
+  else if (action === 'fav') toggleFav(id);
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const star = e.target && e.target.closest && e.target.closest('.star[data-id]');
+  if (star) { e.preventDefault(); setRating(star.dataset.id, parseInt(star.dataset.n)); }
+});
 
 // ─────────────────────────────────────────────
 // 다크모드 / 모바일 시트
@@ -1316,6 +1436,7 @@ function onPlacesChange(payload) {
     upsertLocalPlace(p);
     if (myLoc) p._dist = haversine(myLoc.lat, myLoc.lng, p.lat, p.lng);
     if (markerMap[p.id]) updatePlaceUI(p); else addPlaceToUI(p);
+    resortList();
     applyFilter();
   } else if (ev === 'DELETE') {
     const id = payload.old && payload.old.id;
@@ -1364,7 +1485,8 @@ async function signIn() {
 async function init() {
   renderTagFilters();
   updateNickBtn();
-  updateNearestBtn();
+  document.getElementById('rec-tag').innerHTML =
+    '<option value="">🏷 태그 무관 (전체)</option>' + TAGS.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
   applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
 
   if (!nickname) openNicknameModal();
@@ -1375,6 +1497,10 @@ async function init() {
   await Promise.all([loadPlaces(), loadSummaries(), loadMyRatings()]);
   renderAll();
   subscribeRealtime();
+
+  // 공유 딥링크 (?place=id)
+  const deepId = new URLSearchParams(location.search).get('place');
+  if (deepId && markerMap[deepId]) setTimeout(() => openInfo(deepId), 300);
 
   // PWA 서비스워커
   if ('serviceWorker' in navigator) {
@@ -1391,15 +1517,17 @@ Object.assign(window, {
   startMovePlace, confirmDrag, cancelDrag, applyFilter,
   openAddModal, closeAddModal, startPicking, submitAdd, toggleTag,
   openNicknameModal, closeNicknameModal, saveNickname,
-  openRecommendModal, closeRecommendModal, recommendByCat, gotoRecommend,
-  toggleTheme, toggleSheet, onSidebarHeaderClick, toggleNearestSort
+  openRecommendModal, closeRecommendModal, recommendByCat, gotoRecommend, respinRoulette,
+  toggleTheme, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter
 });
 
 // 테스트 훅 (헤드리스 검증용)
 window.__matzip = {
   get places(){ return places; },
   get summaries(){ return summaries; },
-  onPlacesChange, onRatingsChange, esc
+  get openPlaceId(){ return openPlaceId; },
+  get favs(){ return [...favs]; },
+  buildIwContent, onPlacesChange, onRatingsChange, esc
 };
 
 init();
