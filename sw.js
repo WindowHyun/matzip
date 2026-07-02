@@ -1,6 +1,6 @@
 // 서울 맛집 지도 — 서비스 워커 (앱 셸 캐시, 네트워크 우선)
-const CACHE = 'matzip-v1';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+const CACHE = 'matzip-v2';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
