@@ -1,9 +1,14 @@
 // 서울 맛집 지도 — 서비스 워커 (앱 셸 캐시, 네트워크 우선)
-const CACHE = 'matzip-v2';
+const CACHE = 'matzip-v3';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // skipWaiting은 자동 실행하지 않음 — 페이지의 "업데이트" 버튼 승인 시에만 교체
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+});
+
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
