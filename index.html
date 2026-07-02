@@ -352,6 +352,28 @@
     }
     #pick-banner.show { display: flex; }
 
+    /* 업데이트 알림 배너 */
+    #update-banner {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(110px);
+      background: var(--surface); color: var(--ink);
+      border: 1.5px solid var(--border); border-radius: 14px;
+      padding: 12px 16px; z-index: 150;
+      display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.25);
+      font-size: 13px; white-space: nowrap;
+      transition: transform .3s cubic-bezier(.2,1.1,.4,1);
+    }
+    #update-banner.show { transform: translateX(-50%) translateY(0); }
+    #update-banner button {
+      background: var(--noodle); color: #fff; border: none; border-radius: 8px;
+      padding: 8px 14px; font-size: 13px; font-weight: 700;
+      font-family: inherit; cursor: pointer;
+    }
+    #update-banner button:hover { opacity: .85; }
+    #update-banner .later {
+      background: none; color: var(--muted); font-weight: 400; padding: 8px 4px;
+    }
+
     /* 상태 토스트 */
     #toast {
       position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -508,6 +530,13 @@
       <button class="btn-submit" id="rec-goto-btn" onclick="gotoRecommend()" disabled style="opacity:.4;">📍 지도에서 보기</button>
     </div>
   </div>
+</div>
+
+<!-- 업데이트 알림 배너 -->
+<div id="update-banner" role="alert">
+  <span>🔄 새 버전이 나왔어요!</span>
+  <button onclick="applyUpdate()">업데이트</button>
+  <button class="later" onclick="dismissUpdate()">나중에</button>
 </div>
 
 <!-- 닉네임 모달 -->
@@ -1521,11 +1550,63 @@ async function init() {
   const deepId = new URLSearchParams(location.search).get('place');
   if (deepId && markerMap[deepId]) setTimeout(() => openInfo(deepId), 300);
 
-  // PWA 서비스워커
+  // PWA 서비스워커 + 업데이트 감지
   if ('serviceWorker' in navigator) {
-    try { await navigator.serviceWorker.register('sw.js'); }
+    try { await registerSW(); }
     catch (e) { console.warn('SW 등록 실패', e); }
   }
+}
+
+// ─────────────────────────────────────────────
+// 업데이트 알림 (새 배포 감지 → 팝업)
+// ─────────────────────────────────────────────
+let waitingSW = null;
+let updateAccepted = false;   // '업데이트' 승인 시에만 리로드 (최초 설치 controllerchange 오작동 방지)
+
+function showUpdateBanner(worker) {
+  waitingSW = worker;
+  document.getElementById('update-banner').classList.add('show');
+}
+
+function applyUpdate() {
+  document.getElementById('update-banner').classList.remove('show');
+  updateAccepted = true;
+  if (waitingSW) waitingSW.postMessage({ type: 'SKIP_WAITING' });
+}
+
+function dismissUpdate() {
+  document.getElementById('update-banner').classList.remove('show');
+}
+
+async function registerSW() {
+  const reg = await navigator.serviceWorker.register('sw.js');
+
+  // 이미 대기 중인 새 버전이 있으면 즉시 알림
+  if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner(reg.waiting);
+
+  // 새 버전이 설치되는 순간 감지
+  reg.addEventListener('updatefound', () => {
+    const nw = reg.installing;
+    if (!nw) return;
+    nw.addEventListener('statechange', () => {
+      if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner(nw);
+    });
+  });
+
+  // 업데이트 승인 → 새 워커 활성화 → 자동 새로고침
+  // (최초 설치 시 clients.claim()으로도 controllerchange가 발생하므로 승인 여부 확인)
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!updateAccepted || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+
+  // 탭을 오래 열어둔 사용자도 감지: 탭 복귀 시 + 30분마다 체크
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) reg.update().catch(() => {});
+  });
+  setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
 }
 
 // ─────────────────────────────────────────────
@@ -1537,7 +1618,8 @@ Object.assign(window, {
   openAddModal, closeAddModal, startPicking, submitAdd, toggleTag,
   openNicknameModal, closeNicknameModal, saveNickname,
   openRecommendModal, closeRecommendModal, recommendByCat, gotoRecommend, respinRoulette,
-  toggleTheme, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter
+  toggleTheme, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter,
+  applyUpdate, dismissUpdate
 });
 
 // 테스트 훅 (헤드리스 검증용)
@@ -1546,7 +1628,7 @@ window.__matzip = {
   get summaries(){ return summaries; },
   get openPlaceId(){ return openPlaceId; },
   get favs(){ return [...favs]; },
-  buildIwContent, onPlacesChange, onRatingsChange, esc
+  buildIwContent, onPlacesChange, onRatingsChange, esc, showUpdateBanner
 };
 
 init();
