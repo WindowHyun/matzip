@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>서울 맛집 지도 — 숙대·서울역·남대문</title>
+  <title>서울 맛집 지도</title>
 
   <!-- 테마 선적용 (깜빡임 방지) -->
   <script>try{var _t=localStorage.getItem('matzip_theme');if(_t)document.documentElement.setAttribute('data-theme',_t);}catch(e){}</script>
@@ -350,6 +350,72 @@
     }
     .btn-submit:hover { opacity: .85; }
 
+    /* 고정 위치 컨트롤 */
+    .fixed-ctrl { position: absolute; top: 12px; left: 12px; z-index: 55; }
+    .fixed-fab {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: var(--surface); border: 1.5px solid var(--border);
+      box-shadow: 0 2px 10px rgba(0,0,0,.2); font-size: 19px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .fixed-panel {
+      display: none; margin-top: 8px; width: 230px;
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.22); padding: 10px;
+    }
+    .fixed-panel.open { display: block; }
+    .fixed-head { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+    .fixed-list { display: flex; flex-direction: column; gap: 4px; max-height: 40vh; overflow-y: auto; }
+    .fixed-item { display: flex; align-items: center; gap: 4px; }
+    .fixed-jump {
+      flex: 1; text-align: left; background: var(--soft); border: 1.5px solid var(--border);
+      border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: inherit;
+      color: var(--ink); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .fixed-jump:hover { border-color: var(--ink); }
+    .fixed-reset, .fixed-del {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px;
+      border: 1.5px solid var(--border); background: var(--surface);
+      font-size: 13px; cursor: pointer;
+    }
+    .fixed-del:hover { border-color: var(--danger); }
+    .fixed-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 10px 0; }
+    .fixed-add-btn, .fixed-restore {
+      width: 100%; margin-top: 8px; padding: 9px; border-radius: 8px;
+      border: 1.5px dashed var(--border); background: var(--soft); color: var(--muted);
+      font-size: 12px; font-family: inherit; cursor: pointer;
+    }
+    .fixed-add-btn:hover { border-color: var(--ink); color: var(--ink); }
+    .fixed-restore { border-style: solid; }
+    .fixed-add-form { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .fixed-add-form input {
+      width: 100%; padding: 8px 10px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 13px; font-family: inherit; outline: none;
+      background: var(--surface); color: var(--ink);
+    }
+    .fixed-add-actions { display: flex; gap: 6px; }
+    .fixed-add-actions button {
+      flex: 1; padding: 8px; border-radius: 8px; font-size: 12px; font-family: inherit; cursor: pointer; border: none;
+    }
+    .fixed-cancel { background: var(--chip); color: var(--ink); }
+    .fixed-save { background: var(--accent); color: #fff; font-weight: 700; }
+
+    /* 위치 지정 십자선 */
+    #center-cross {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 30px; color: var(--noodle); z-index: 52; display: none;
+      pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.4); font-weight: 700;
+    }
+    #center-cross.show { display: block; }
+    #fixed-banner {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: var(--noodle); color: #fff; padding: 8px 16px;
+      border-radius: 20px; font-size: 13px; z-index: 56;
+      box-shadow: 0 2px 12px rgba(0,0,0,.2);
+      display: none; align-items: center; gap: 4px; white-space: nowrap; pointer-events: all;
+    }
+    #fixed-banner.show { display: flex; }
+
     /* 지도 위 안내 배너 */
     #pick-banner {
       position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
@@ -491,7 +557,7 @@
   <header>
     <div>
       <h1>🍜 서울 맛집 지도</h1>
-      <span id="count-label">숙대 · 서울역 · 남대문 일대</span>
+      <span id="count-label">서울 맛집 지도</span>
     </div>
     <div class="header-right">
       <button class="rec-btn" onclick="openRecommendModal()">🎲 추천</button>
@@ -541,6 +607,33 @@
     <div class="map-wrap">
       <div id="map" style="width:100%;height:100%;"></div>
       <div id="loading"><div class="loading-bowl">🍜</div><div>맛집 불러오는 중…</div></div>
+
+      <!-- 고정 위치 (빠른 이동) -->
+      <div class="fixed-ctrl" id="fixed-ctrl">
+        <button class="fixed-fab" id="fixed-fab" onclick="toggleFixedPanel()" aria-label="고정 위치" title="고정 위치">📌</button>
+        <div class="fixed-panel" id="fixed-panel">
+          <div class="fixed-head">📌 고정 위치</div>
+          <div class="fixed-list" id="fixed-list"></div>
+          <div class="fixed-add-form" id="fixed-add-form" style="display:none;">
+            <input id="fixed-name" maxlength="20" placeholder="이름 (예: 우리집)" />
+            <div class="fixed-add-actions">
+              <button class="fixed-cancel" onclick="cancelAddFixed()">취소</button>
+              <button class="fixed-save" onclick="startFixedPick()">지도에서 위치 지정 →</button>
+            </div>
+          </div>
+          <button class="fixed-add-btn" id="fixed-add-btn" onclick="showAddFixed()">＋ 위치 추가</button>
+          <button class="fixed-restore" id="fixed-restore" onclick="restoreDefaultFixed()" style="display:none;">기본 위치(OYC·WST) 복원</button>
+        </div>
+      </div>
+
+      <!-- 위치 지정 십자선 + 배너 -->
+      <div id="center-cross">✛</div>
+      <div id="fixed-banner">
+        <span id="fixed-banner-text"></span>&nbsp;
+        <button onclick="confirmFixedPick()" style="background:rgba(255,255,255,.95);border:none;color:#1a1a1a;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;font-weight:700;">✅ 저장</button>
+        <button onclick="cancelFixedPick()" style="background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;margin-left:4px;">✕ 취소</button>
+      </div>
+
       <div id="pick-banner">
         <span id="pick-banner-text"></span>
         &nbsp;
@@ -776,6 +869,7 @@ let suppressMapClickUntil = 0;
 
 naver.maps.Event.addListener(map, 'click', () => {
   if (Date.now() < suppressMapClickUntil) return;
+  if (fixedPickMode) return;
   if (!movingId && !isDraggingNew) {
     if (openIW) { openIW.close(); openIW = null; openPlaceId = null; }
     if (activeListItem) { activeListItem.classList.remove('active'); activeListItem = null; }
@@ -942,7 +1036,7 @@ function updateCountLabel() {
     if (matchesFilter(p, query)) visible++;
   });
   document.getElementById('count-label').textContent =
-    `숙대 · 서울역 · 남대문 일대 · ${visible}곳`;
+    `서울 맛집 지도 · ${visible}곳`;
 }
 
 // ─────────────────────────────────────────────
@@ -1677,6 +1771,158 @@ document.addEventListener('click', handleActionClick);
 document.addEventListener('keydown', handleStarKeydown);
 
 // ─────────────────────────────────────────────
+// 고정 위치 (빠른 이동 북마크)
+// ─────────────────────────────────────────────
+const DEFAULT_FIXED = [
+  { id: 'f-oyc', name: 'OYC (용산)',     lat: 37.5501, lng: 126.9712 },  // 한강대로 372, 동자동
+  { id: 'f-wst', name: 'WST 본사 (강남)', lat: 37.5060, lng: 127.0265 },  // 강남대로112길 29, 논현동
+];
+
+function loadFixed() {
+  let arr = null;
+  try { arr = JSON.parse(localStorage.getItem('matzip_fixed')); } catch { arr = null; }
+  if (!Array.isArray(arr)) {              // 최초 1회 기본값 시드
+    arr = DEFAULT_FIXED.map(f => ({ ...f }));
+    localStorage.setItem('matzip_fixed', JSON.stringify(arr));
+  }
+  return arr;
+}
+let fixedList = loadFixed();
+function saveFixedList() { localStorage.setItem('matzip_fixed', JSON.stringify(fixedList)); }
+
+let fixedHighlight = null;
+let fixedPickMode = null;   // { mode:'add', name } | { mode:'reset', id }
+
+function renderFixed() {
+  const el = document.getElementById('fixed-list');
+  el.innerHTML = fixedList.length
+    ? fixedList.map(f => `
+        <div class="fixed-item">
+          <button class="fixed-jump" data-fx="jump" data-fid="${esc(f.id)}">📍 ${esc(f.name)}</button>
+          <button class="fixed-reset" data-fx="reset" data-fid="${esc(f.id)}" title="현재 지도 중심으로 위치 변경" aria-label="위치 변경">🎯</button>
+          <button class="fixed-del" data-fx="del" data-fid="${esc(f.id)}" title="삭제" aria-label="삭제">🗑</button>
+        </div>`).join('')
+    : '<div class="fixed-empty">저장된 위치가 없어요</div>';
+  // 기본 위치가 하나라도 빠졌으면 복원 버튼 노출
+  const missDefault = DEFAULT_FIXED.some(d => !fixedList.find(f => f.id === d.id));
+  document.getElementById('fixed-restore').style.display = missDefault ? '' : 'none';
+}
+
+function toggleFixedPanel(force) {
+  const p = document.getElementById('fixed-panel');
+  const open = typeof force === 'boolean' ? force : !p.classList.contains('open');
+  p.classList.toggle('open', open);
+  if (open) { renderFixed(); cancelAddFixed(); }
+}
+
+function jumpToFixed(id) {
+  const f = fixedList.find(x => x.id === id);
+  if (!f) return;
+  const pos = new naver.maps.LatLng(f.lat, f.lng);
+  map.setZoom(17);
+  map.panTo(pos);
+  if (fixedHighlight) fixedHighlight.setMap(null);
+  fixedHighlight = new naver.maps.Marker({
+    position: pos, map,
+    icon: { content: `<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));animation:bowlBounce .6s ease-in-out 2;">📌</div>`, anchor: new naver.maps.Point(15, 30) }
+  });
+  const hl = fixedHighlight;
+  setTimeout(() => { if (hl) hl.setMap(null); if (fixedHighlight === hl) fixedHighlight = null; }, 3000);
+  toast(`📍 ${f.name}(으)로 이동`);
+  if (window.matchMedia('(max-width: 640px)').matches) toggleFixedPanel(false);
+}
+
+function showAddFixed() {
+  document.getElementById('fixed-add-form').style.display = 'flex';
+  document.getElementById('fixed-add-btn').style.display = 'none';
+  document.getElementById('fixed-name').value = '';
+  setTimeout(() => document.getElementById('fixed-name').focus(), 50);
+}
+function cancelAddFixed() {
+  document.getElementById('fixed-add-form').style.display = 'none';
+  document.getElementById('fixed-add-btn').style.display = '';
+}
+
+function startFixedPick() {
+  const name = document.getElementById('fixed-name').value.trim();
+  if (!name) { alert('이름을 입력해주세요.'); return; }
+  beginFixedPickMode({ mode: 'add', name });
+}
+function resetFixedPos(id) {
+  const f = fixedList.find(x => x.id === id);
+  if (!f) return;
+  map.panTo(new naver.maps.LatLng(f.lat, f.lng));
+  beginFixedPickMode({ mode: 'reset', id });
+}
+
+function beginFixedPickMode(m) {
+  fixedPickMode = m;
+  toggleFixedPanel(false);
+  document.getElementById('center-cross').classList.add('show');
+  const label = m.mode === 'add'
+    ? `📌 지도를 옮겨 "${m.name}" 위치를 맞추세요`
+    : `🎯 지도를 옮겨 위치를 다시 맞추세요`;
+  document.getElementById('fixed-banner-text').textContent = label;
+  document.getElementById('fixed-banner').classList.add('show');
+}
+
+function endFixedPickMode() {
+  fixedPickMode = null;
+  document.getElementById('center-cross').classList.remove('show');
+  document.getElementById('fixed-banner').classList.remove('show');
+}
+
+function confirmFixedPick() {
+  if (!fixedPickMode) return;
+  const c = map.getCenter();
+  const lat = c.lat(), lng = c.lng();
+  if (fixedPickMode.mode === 'add') {
+    fixedList.push({ id: 'u' + Date.now(), name: fixedPickMode.name, lat, lng });
+    toast('고정 위치 추가됨 📌');
+  } else {
+    const f = fixedList.find(x => x.id === fixedPickMode.id);
+    if (f) { f.lat = lat; f.lng = lng; }
+    toast('위치 변경됨 🎯');
+  }
+  saveFixedList();
+  endFixedPickMode();
+  toggleFixedPanel(true);
+}
+function cancelFixedPick() { endFixedPickMode(); toggleFixedPanel(true); }
+
+function deleteFixed(id) {
+  const f = fixedList.find(x => x.id === id);
+  if (!f) return;
+  if (!confirm(`고정 위치 "${f.name}"을(를) 삭제할까요?`)) return;
+  fixedList = fixedList.filter(x => x.id !== id);
+  saveFixedList();
+  renderFixed();
+  toast('삭제됨');
+}
+
+function restoreDefaultFixed() {
+  DEFAULT_FIXED.forEach(d => { if (!fixedList.find(f => f.id === d.id)) fixedList.push({ ...d }); });
+  saveFixedList();
+  renderFixed();
+  toast('기본 위치 복원됨');
+}
+
+// 고정 패널 버튼 위임
+document.getElementById('fixed-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-fx][data-fid]');
+  if (!b) return;
+  const { fx, fid } = b.dataset;
+  if (fx === 'jump') jumpToFixed(fid);
+  else if (fx === 'reset') resetFixedPos(fid);
+  else if (fx === 'del') deleteFixed(fid);
+});
+// 패널 바깥 클릭 시 닫기
+document.addEventListener('click', e => {
+  const p = document.getElementById('fixed-panel');
+  if (p.classList.contains('open') && !e.target.closest('#fixed-ctrl')) toggleFixedPanel(false);
+});
+
+// ─────────────────────────────────────────────
 // 다크모드 / 모바일 시트
 // ─────────────────────────────────────────────
 function applyTheme(t) {
@@ -1848,6 +2094,7 @@ async function signIn() {
 // ─────────────────────────────────────────────
 async function init() {
   renderTagFilters();
+  renderFixed();
   updateNickBtn();
   document.getElementById('rec-tag').innerHTML =
     '<option value="">🏷 태그 무관 (전체)</option>' + TAGS.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
@@ -1937,6 +2184,8 @@ Object.assign(window, {
   openRecommendModal, closeRecommendModal, recommendByCat, gotoRecommend, respinRoulette,
   toggleTheme, toggleMenu, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter,
   onDelInput, cancelDelete, confirmDelete,
+  toggleFixedPanel, showAddFixed, cancelAddFixed, startFixedPick,
+  confirmFixedPick, cancelFixedPick, restoreDefaultFixed,
   applyUpdate, dismissUpdate
 });
 
@@ -1947,6 +2196,8 @@ window.__matzip = {
   get openPlaceId(){ return openPlaceId; },
   get activeMarkerId(){ return activeMarkerId; },
   get favs(){ return [...favs]; },
+  get fixedList(){ return fixedList; },
+  jumpToFixed, deleteFixed,
   buildIwContent, buildIwElement, onPlacesChange, onRatingsChange, esc, showUpdateBanner
 };
 
