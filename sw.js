@@ -1,10 +1,15 @@
 // 서울 맛집 지도 — 서비스 워커 (앱 셸 캐시, 네트워크 우선)
-const CACHE = 'matzip-v3';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png'];
+const CACHE = 'matzip-v4';
+const ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon.svg', './icon-180.png'];
 
 self.addEventListener('install', e => {
-  // skipWaiting은 자동 실행하지 않음 — 페이지의 "업데이트" 버튼 승인 시에만 교체
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => {
+      // 최초 설치(활성 SW 없음)면 즉시 활성화.
+      // 업데이트일 때만 대기 → 페이지의 "업데이트" 버튼 승인(SKIP_WAITING) 시 교체
+      if (!self.registration.active) return self.skipWaiting();
+    })
+  );
 });
 
 self.addEventListener('message', e => {
