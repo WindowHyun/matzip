@@ -25,7 +25,7 @@ const TAG_LABEL = Object.fromEntries(TAGS.map(t => [t.id, t.label]));
 // 기본 데이터 (Supabase 로드 실패 시 폴백)
 // ─────────────────────────────────────────────
 const DEFAULT_PLACES = [
-  { id:'d1', cat:'noodle', name:'후암 쌀국수 (아시안)', menu:'소고기 쌀국수 9,500원', comment:'후암동 / 완자도 넣어줌 맛있음', lat:37.5485, lng:126.9759, tags:[], added_by:'기본데이터' },
+  { id:'d1', cat:'noodle', name:'후암 쌀국수 (아시안)', menu:'소고기 쌀국수 9,500원', comment:'후암동 / 완자도 넣어줌 맛있음 / 매운 쌀국수 9,500원', lat:37.5484953, lng:126.9759131, tags:[], added_by:'기본데이터' },
 ];
 
 // ─────────────────────────────────────────────
