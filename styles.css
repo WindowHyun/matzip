@@ -205,8 +205,6 @@ header span { font-size: 11px; color: var(--muted); margin-top: 2px; display: bl
 }
 .iw-sub-btn:hover { filter: brightness(.95); }
 .iw-sub-btn.fav-on { border-color: #e0447c; color: #e0447c; background: #fff0f5; }
-.iw-sub-btn.visit-on { border-color: var(--rice); color: var(--rice); background: #f0faf4; }
-[data-theme="dark"] .iw-sub-btn.visit-on { background: #16301f; }
 .list { overflow-y: auto; flex: 1; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 #recent-strip {
   padding: 8px 12px; border-bottom: 1px solid var(--border);

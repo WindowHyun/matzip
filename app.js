@@ -50,8 +50,6 @@ let myLoc = null;          // { lat, lng }
 let sortMode = 'default';  // default | dist | rating | name
 let favs = new Set((() => { try { return JSON.parse(localStorage.getItem('matzip_favs') || '[]'); } catch { return []; } })());
 let favOnly = false;
-let visited = new Set((() => { try { return JSON.parse(localStorage.getItem('matzip_visited') || '[]'); } catch { return []; } })());
-let notVisitedOnly = false;
 let recent = (() => { try { return JSON.parse(localStorage.getItem('matzip_recent')) || []; } catch { return []; } })();
 let lastRecCat = 'all';
 
@@ -181,7 +179,6 @@ function buildIwContent(p) {
         <button class="iw-sub-btn" data-action="nav" data-id="${pid}">🧭 길찾기</button>
         <button class="iw-sub-btn" data-action="share" data-id="${pid}">🔗 공유</button>
         <button class="iw-sub-btn ${favs.has(p.id)?'fav-on':''}" data-action="fav" data-id="${pid}" aria-label="찜 토글" style="flex:0 0 40px;">${favs.has(p.id)?'❤️':'🤍'}</button>
-        <button class="iw-sub-btn ${visited.has(p.id)?'visit-on':''}" data-action="visit" data-id="${pid}" aria-label="가봤어요 토글" title="가봤어요" style="flex:0 0 40px;">${visited.has(p.id)?'✅':'⬜'}</button>
         <button class="iw-sub-btn" data-action="more" data-id="${pid}" aria-label="더보기" style="flex:0 0 34px;">⋯</button>
       </div>
       <div class="iw-actions iw-more" style="display:none;border-top:none;padding-top:0;">
@@ -211,7 +208,6 @@ function listItemInner(p) {
       <div class="item-meta">
         <span class="item-tag ${p.cat}">${catLabel(p.cat)}</span>
         ${favs.has(p.id) ? '<span class="item-fav">❤️</span>' : ''}
-        ${visited.has(p.id) ? '<span class="item-fav">✅</span>' : ''}
         ${sum && sum.count>0 ? `<span class="item-stars">${avgStars(sum.average)}</span><span class="item-tagbadge">${sum.average}</span>` : ''}
         ${distHtml}
         ${tagBadgesHtml}
@@ -530,8 +526,6 @@ function matchesFilter(p, query) {
   const matchCat  = activeFilter === 'all' || p.cat === activeFilter;
   const matchTag  = !activeTagFilter || (p.tags || []).includes(activeTagFilter);
   const matchFav  = !favOnly || favs.has(p.id);
-  const matchVis  = !notVisitedOnly || !visited.has(p.id);
-  if (!matchVis) return false;
   const matchName = !query
     || p.name.toLowerCase().includes(query)
     || (p.menu || '').toLowerCase().includes(query)
@@ -603,7 +597,6 @@ function renderTagFilters() {
   const wrap = document.getElementById('tag-filters');
   wrap.innerHTML =
     `<button class="tag-chip fav ${favOnly?'active':''}" onclick="toggleFavFilter()" aria-label="찜한 곳만 보기">❤️ 찜</button>` +
-    `<button class="tag-chip unvisited ${notVisitedOnly?'active':''}" onclick="toggleUnvisitedFilter()" aria-label="안 가본 곳만 보기">🆕 안 가본 곳</button>` +
     TAGS.map(t =>
       `<button class="tag-chip ${activeTagFilter===t.id?'active':''}" onclick="filterByTag('${t.id}')">${t.label}</button>`
     ).join('');
@@ -832,13 +825,6 @@ async function recommendByCat(cat) {
   const tagSel = document.getElementById('rec-tag').value;
   if (tagSel) pool = pool.filter(p => (p.tags || []).includes(tagSel));
 
-  // 안 가본 곳만
-  if (document.getElementById('rec-unvisited').checked) {
-    const un = pool.filter(p => !visited.has(p.id));
-    if (un.length) pool = un;
-    else toast('안 가본 곳이 없어 전체에서 추천해요');
-  }
-
   // 내 주변만
   if (document.getElementById('rec-near').checked) {
     try { await ensureMyLocation(); } catch { toast('위치 권한이 필요해요'); }
@@ -999,21 +985,6 @@ function toggleFavFilter() {
   applyFilter();
 }
 
-function toggleUnvisitedFilter() {
-  notVisitedOnly = !notVisitedOnly;
-  renderTagFilters();
-  applyFilter();
-}
-
-function toggleVisited(id) {
-  if (visited.has(id)) visited.delete(id); else visited.add(id);
-  localStorage.setItem('matzip_visited', JSON.stringify([...visited]));
-  const p = places.find(x => x.id === id);
-  if (p) updatePlaceUI(p);
-  if (notVisitedOnly) applyFilter();
-  toast(visited.has(id) ? '가봤어요 체크 ✅' : '가봤어요 해제');
-}
-
 // ─────────────────────────────────────────────
 // 최근 본 맛집
 // ─────────────────────────────────────────────
@@ -1052,7 +1023,6 @@ function handleActionClick(e) {
   else if (action === 'nav') openDirections(id);
   else if (action === 'share') copyShareLink(id);
   else if (action === 'fav') toggleFav(id);
-  else if (action === 'visit') toggleVisited(id);
   else if (action === 'more') {
     const more = btn.closest('.iw')?.querySelector('.iw-more');
     if (more) more.style.display = more.style.display === 'none' ? 'flex' : 'none';
@@ -1245,7 +1215,7 @@ function exportData() {
   const data = {
     exportedAt: new Date().toISOString(),
     places, summaries,
-    favs: [...favs], visited: [...visited], fixed: fixedList, nickname
+    favs: [...favs], fixed: fixedList, nickname
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -1264,7 +1234,6 @@ async function importData(input) {
     const j = JSON.parse(await f.text());
     // 개인 데이터만 복원 (맛집 데이터는 DB가 원본)
     if (Array.isArray(j.favs)) { favs = new Set(j.favs); localStorage.setItem('matzip_favs', JSON.stringify([...favs])); }
-    if (Array.isArray(j.visited)) { visited = new Set(j.visited); localStorage.setItem('matzip_visited', JSON.stringify([...visited])); }
     if (Array.isArray(j.fixed)) { fixedList = j.fixed; saveFixedList(); renderFixed(); }
     renderAll();
     toast('가져오기 완료 (찜·가봤어요·고정위치)');
@@ -1613,7 +1582,7 @@ Object.assign(window, {
   openNicknameModal, closeNicknameModal, saveNickname, skipNickname,
   openRecommendModal, closeRecommendModal, recommendByCat, gotoRecommend, respinRoulette,
   toggleTheme, toggleMenu, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter,
-  toggleUnvisitedFilter, toggleMapType, exportData, importData,
+  toggleMapType, exportData, importData,
   onDelInput, cancelDelete, confirmDelete,
   toggleFixedPanel, showAddFixed, cancelAddFixed, startFixedPick,
   confirmFixedPick, cancelFixedPick, restoreDefaultFixed,
@@ -1627,7 +1596,6 @@ window.__matzip = {
   get openPlaceId(){ return openPlaceId; },
   get activeMarkerId(){ return activeMarkerId; },
   get favs(){ return [...favs]; },
-  get visited(){ return [...visited]; },
   get fixedList(){ return fixedList; },
   get markerMap(){ return markerMap; },
   jumpToFixed, deleteFixedNow,

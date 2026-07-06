@@ -436,24 +436,6 @@ await page.selectOption('#sort-select', 'default');
 await page.waitForTimeout(60);
 
 await page.evaluate(() => window.dismissUpdate());   // 혹시 떠 있는 배너 정리
-// S. 가봤어요
-await page.evaluate(() => {
-  const p = window.__matzip.places.find(x => x.id === 'd1');
-  const div = document.createElement('div'); div.id = 'visit-test';
-  div.innerHTML = window.__matzip.buildIwContent(p);
-  document.body.appendChild(div);
-});
-await page.click('#visit-test [data-action="visit"]');
-await page.waitForTimeout(60);
-const visArr = await page.evaluate(() => window.__matzip.visited);
-await page.evaluate(() => document.getElementById('visit-test').remove());
-ok('가봤어요 토글(localStorage)', visArr.includes('d1'), JSON.stringify(visArr));
-await page.click('.tag-chip.unvisited');
-const unVis = await page.evaluate(() => [...document.querySelectorAll('#list .list-item')].filter(e => e.style.display !== 'none').length);
-ok('안 가본 곳 필터', unVis === 1, `visible=${unVis}`);
-await page.click('.tag-chip.unvisited');
-ok('룰렛 "안 가본 곳만" 옵션', await page.evaluate(() => !!document.getElementById('rec-unvisited')));
-
 // T. 최근 본 맛집
 await page.evaluate(() => window.openInfo('d1'));
 await page.waitForTimeout(80);
@@ -471,7 +453,7 @@ const [download] = await Promise.all([
 ok('데이터 내보내기(다운로드)', download.suggestedFilename().startsWith('matzip-backup-'), download.suggestedFilename());
 await page.setInputFiles('#import-file', {
   name: 'backup.json', mimeType: 'application/json',
-  buffer: Buffer.from(JSON.stringify({ favs: ['x1'], visited: [], fixed: [] }))
+  buffer: Buffer.from(JSON.stringify({ favs: ['x1'], fixed: [] }))
 });
 await page.waitForTimeout(150);
 const imported = await page.evaluate(() => window.__matzip.favs);
