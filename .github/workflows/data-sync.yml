@@ -1,0 +1,20 @@
+name: 데이터 정합성 검사 (프론트 ↔ DB)
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * *'   # 매일 09:00 KST — DB만 바뀐 드리프트도 감지
+  workflow_dispatch:
+
+jobs:
+  data-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # 시크릿 불필요 — anon key는 클라이언트 공개 키라 app.js에서 추출해 사용
+      - name: 프론트 ↔ DB 데이터 정합성 검사
+        run: node tests/check-data-sync.mjs
