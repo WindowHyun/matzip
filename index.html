@@ -133,7 +133,7 @@
 <!-- 추가 모달 (2단계: 정보 입력 → 위치 선택) -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
-    <h2 id="add-title">🍽 맛집 추가 <span class="step-badge" id="add-step-badge">1/2</span></h2>
+    <h2 id="add-title"><span id="add-title-text">🍽 맛집 추가</span> <span class="step-badge" id="add-step-badge">1/2</span></h2>
     <div id="add-step1">
       <div class="form-row">
         <label>매장명 *</label>
@@ -161,7 +161,7 @@
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeAddModal()">취소</button>
-        <button class="btn-submit" onclick="nextAddStep()">다음: 위치 선택 →</button>
+        <button class="btn-submit" id="add-next-btn" onclick="primaryStep1()">다음: 위치 선택 →</button>
       </div>
     </div>
     <div id="add-step2" style="display:none;">
