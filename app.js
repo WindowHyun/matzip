@@ -182,6 +182,7 @@ function buildIwContent(p) {
         <button class="iw-sub-btn" data-action="more" data-id="${pid}" aria-label="더보기" style="flex:0 0 34px;">⋯</button>
       </div>
       <div class="iw-actions iw-more" style="display:none;border-top:none;padding-top:0;">
+        <button class="iw-move-btn" data-action="edit" data-id="${pid}">✏️ 정보 수정</button>
         <button class="iw-move-btn" data-action="move" data-id="${pid}">📍 위치 수정</button>
         <button class="iw-del-btn" data-action="del" data-id="${pid}">🗑 삭제</button>
       </div>
@@ -637,6 +638,7 @@ let isDraggingNew = false;
 let tempDragMarker = null;
 let pickedLat = null, pickedLng = null;
 let selectedTags = [];
+let editingId = null;   // null=추가 모드, id=수정 모드
 
 function renderTagToggles() {
   const wrap = document.getElementById('f-tags');
@@ -657,6 +659,12 @@ function setAddStep(step) {
   document.getElementById('add-step-badge').textContent = step + '/2';
 }
 
+// step1 하단 버튼: 추가 모드는 위치 선택 단계로, 수정 모드는 바로 저장
+function primaryStep1() {
+  if (editingId) submitEdit();
+  else nextAddStep();
+}
+
 function nextAddStep() {
   if (!document.getElementById('f-name').value.trim()) { alert('매장명을 입력해주세요.'); return; }
   setAddStep(2);
@@ -665,13 +673,63 @@ function nextAddStep() {
 function prevAddStep() { setAddStep(1); }
 
 function openAddModal() {
+  editingId = null;
+  document.getElementById('add-title-text').textContent = '🍽 맛집 추가';
+  document.getElementById('add-step-badge').style.display = '';
+  document.getElementById('add-next-btn').textContent = '다음: 위치 선택 →';
   selectedTags = [];
   renderTagToggles();
   setAddStep(1);
   document.getElementById('modal-overlay').classList.add('open');
 }
 
+// 이미 등록된 정보 수정 (이름/카테고리/메뉴/코멘트/태그). 위치는 '위치 수정'에서 별도 처리
+function openEditModal(id) {
+  if (readOnly) { toast('정보 수정은 로그인(익명) 활성화 후 가능해요'); return; }
+  const p = places.find(x => x.id === id);
+  if (!p) return;
+  if (openIW) { openIW.close(); openIW = null; openPlaceId = null; }
+  editingId = id;
+  document.getElementById('f-name').value = p.name || '';
+  document.getElementById('f-cat').value = p.cat || 'noodle';
+  document.getElementById('f-menu').value = p.menu || '';
+  document.getElementById('f-comment').value = p.comment || '';
+  selectedTags = (p.tags || []).slice();
+  renderTagToggles();
+  document.getElementById('add-title-text').textContent = '✏️ 정보 수정';
+  document.getElementById('add-step-badge').style.display = 'none';
+  document.getElementById('add-next-btn').textContent = '저장';
+  setAddStep(1);
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+async function submitEdit() {
+  const id = editingId;
+  const p = places.find(x => x.id === id);
+  if (!p) { closeAddModal(); return; }
+  const name    = document.getElementById('f-name').value.trim();
+  const cat     = document.getElementById('f-cat').value;
+  const menu    = document.getElementById('f-menu').value.trim();
+  const comment = document.getElementById('f-comment').value.trim();
+
+  if (!name) { alert('매장명을 입력해주세요.'); return; }
+  if (readOnly) { toast('정보 수정은 로그인(익명) 활성화 후 가능해요'); return; }
+
+  const patch = { name, cat, menu, comment, tags: selectedTags.slice() };
+  const { error } = await supabase.from('places').update(patch).eq('id', id);
+  if (error) { alert('수정 실패: ' + error.message); return; }
+
+  Object.assign(p, patch);
+  updatePlaceUI(p);
+  resortList();
+  applyFilter();
+  closeAddModal();
+  setTimeout(() => openInfo(id), 200);
+  toast('정보 수정됨 ✏️');
+}
+
 function closeAddModal() {
+  editingId = null;
   document.getElementById('modal-overlay').classList.remove('open');
   stopAddDrag();
   document.getElementById('f-name').value = '';
@@ -1019,6 +1077,7 @@ function handleActionClick(e) {
   e.stopPropagation();
   const { action, id } = btn.dataset;
   if (action === 'move') startMovePlace(id);
+  else if (action === 'edit') openEditModal(id);
   else if (action === 'del') deletePlace(id);
   else if (action === 'nav') openDirections(id);
   else if (action === 'share') copyShareLink(id);
@@ -1579,6 +1638,7 @@ Object.assign(window, {
   filterMarkers, filterByTag, onSearchInput, openInfo, setRating, deletePlace,
   startMovePlace, confirmDrag, cancelDrag, applyFilter, resetFilters,
   openAddModal, closeAddModal, nextAddStep, prevAddStep, startPicking, submitAdd, toggleTag,
+  primaryStep1, openEditModal, submitEdit,
   openNicknameModal, closeNicknameModal, saveNickname, skipNickname,
   openRecommendModal, closeRecommendModal, recommendByCat, gotoRecommend, respinRoulette,
   toggleTheme, toggleMenu, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter,
