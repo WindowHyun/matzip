@@ -65,6 +65,11 @@ function avgStars(avg) {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
 }
 function catEmoji(cat) { return cat === 'noodle' ? '🍜' : cat === 'rice' ? '🍚' : '🎪'; }
+function commentLinesHtml(comment) {
+  if (!comment) return '';
+  return comment.split('\n').map(s => s.trim()).filter(Boolean)
+    .map(l => `<div class="comment-line">💬 ${esc(l)}</div>`).join('');
+}
 function catColor(cat) { return cat === 'noodle' ? '#e85d26' : cat === 'rice' ? '#2c7a4b' : '#7b5ea7'; }
 function catLabel(cat) { return cat === 'noodle' ? '면류' : cat === 'rice' ? '밥류+a' : '기타'; }
 
@@ -173,7 +178,7 @@ function buildIwContent(p) {
       </div>
       <div class="iw-menu">${esc(p.menu || '')}</div>
       ${tagBadges}
-      ${p.comment ? `<div class="iw-comment">💬 ${esc(p.comment)}</div>` : ''}
+      ${p.comment ? `<div class="iw-comment">${commentLinesHtml(p.comment)}</div>` : ''}
       <div class="iw-author">추가한 사람: ${esc(p.added_by || '익명')}</div>
       <div class="iw-actions">
         <button class="iw-sub-btn" data-action="nav" data-id="${pid}">🧭 길찾기</button>
@@ -653,6 +658,34 @@ function toggleTag(tagId) {
   renderTagToggles();
 }
 
+function commentLineRowHtml(value) {
+  return `<div class="comment-line-row">
+    <input type="text" class="comment-line-input" value="${esc(value)}" placeholder="맛, 위치, 팁 등 자유롭게" />
+    <button type="button" class="comment-line-del" onclick="removeCommentLine(this)" aria-label="줄 삭제">✕</button>
+  </div>`;
+}
+function renderCommentLines(lines) {
+  const wrap = document.getElementById('f-comment-lines');
+  wrap.innerHTML = (lines && lines.length ? lines : ['']).map(commentLineRowHtml).join('');
+}
+function addCommentLine() {
+  document.getElementById('f-comment-lines').insertAdjacentHTML('beforeend', commentLineRowHtml(''));
+  const inputs = document.querySelectorAll('#f-comment-lines .comment-line-input');
+  inputs[inputs.length - 1].focus();
+}
+function removeCommentLine(btn) {
+  const wrap = document.getElementById('f-comment-lines');
+  const row = btn.closest('.comment-line-row');
+  if (wrap.children.length <= 1) { row.querySelector('.comment-line-input').value = ''; return; }
+  row.remove();
+}
+function getCommentLinesValue() {
+  return [...document.querySelectorAll('#f-comment-lines .comment-line-input')]
+    .map(i => i.value.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
 function setAddStep(step) {
   document.getElementById('add-step1').style.display = step === 1 ? '' : 'none';
   document.getElementById('add-step2').style.display = step === 2 ? '' : 'none';
@@ -679,6 +712,7 @@ function openAddModal() {
   document.getElementById('add-next-btn').textContent = '다음: 위치 선택 →';
   selectedTags = [];
   renderTagToggles();
+  renderCommentLines([]);
   setAddStep(1);
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -693,7 +727,7 @@ function openEditModal(id) {
   document.getElementById('f-name').value = p.name || '';
   document.getElementById('f-cat').value = p.cat || 'noodle';
   document.getElementById('f-menu').value = p.menu || '';
-  document.getElementById('f-comment').value = p.comment || '';
+  renderCommentLines((p.comment || '').split('\n').map(s => s.trim()).filter(Boolean));
   selectedTags = (p.tags || []).slice();
   renderTagToggles();
   document.getElementById('add-title-text').textContent = '✏️ 정보 수정';
@@ -710,7 +744,7 @@ async function submitEdit() {
   const name    = document.getElementById('f-name').value.trim();
   const cat     = document.getElementById('f-cat').value;
   const menu    = document.getElementById('f-menu').value.trim();
-  const comment = document.getElementById('f-comment').value.trim();
+  const comment = getCommentLinesValue();
 
   if (!name) { alert('매장명을 입력해주세요.'); return; }
   if (readOnly) { toast('정보 수정은 로그인(익명) 활성화 후 가능해요'); return; }
@@ -734,7 +768,7 @@ function closeAddModal() {
   stopAddDrag();
   document.getElementById('f-name').value = '';
   document.getElementById('f-menu').value = '';
-  document.getElementById('f-comment').value = '';
+  renderCommentLines([]);
   selectedTags = [];
   pickedLat = null; pickedLng = null;
   document.getElementById('pick-hint').textContent = '버튼을 누르면 지도에 드래그 핀이 생깁니다';
@@ -780,7 +814,7 @@ async function submitAdd() {
   const name    = document.getElementById('f-name').value.trim();
   const cat     = document.getElementById('f-cat').value;
   const menu    = document.getElementById('f-menu').value.trim();
-  const comment = document.getElementById('f-comment').value.trim();
+  const comment = getCommentLinesValue();
 
   if (!name) { alert('매장명을 입력해주세요.'); return; }
   if (!pickedLat || !pickedLng) { alert('위치를 먼저 선택해주세요.'); return; }
@@ -974,7 +1008,7 @@ function renderRecResult(p) {
       ${distHtml}
       <div class="rec-menu">${esc(p.menu || '')}</div>
       ${tagsHtml}
-      ${p.comment ? `<div class="rec-comment">💬 ${esc(p.comment)}</div>` : ''}
+      ${p.comment ? `<div class="rec-comment">${commentLinesHtml(p.comment)}</div>` : ''}
       <button class="btn-cancel" style="width:100%;margin-top:10px;" onclick="respinRoulette()">🔁 다시 돌리기</button>
     </div>`;
 }
@@ -1638,7 +1672,7 @@ Object.assign(window, {
   filterMarkers, filterByTag, onSearchInput, openInfo, setRating, deletePlace,
   startMovePlace, confirmDrag, cancelDrag, applyFilter, resetFilters,
   openAddModal, closeAddModal, nextAddStep, prevAddStep, startPicking, submitAdd, toggleTag,
-  primaryStep1, openEditModal, submitEdit,
+  primaryStep1, openEditModal, submitEdit, addCommentLine, removeCommentLine,
   openNicknameModal, closeNicknameModal, saveNickname, skipNickname,
   openRecommendModal, closeRecommendModal, recommendByCat, gotoRecommend, respinRoulette,
   toggleTheme, toggleMenu, toggleSheet, onSidebarHeaderClick, onSortChange, toggleFavFilter,
