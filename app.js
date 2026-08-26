@@ -165,31 +165,34 @@ function buildIwContent(p) {
   return `
     <div class="iw">
       <div class="iw-title-row">
-        <a class="iw-name" href="${naverSearchUrl}" target="_blank" rel="noopener">${esc(p.name)}</a>
+        <a class="iw-name" href="${naverSearchUrl}" target="_blank" rel="noopener">${catEmoji(p.cat)} ${esc(p.name)}</a>
         <a href="${naverSearchUrl}" target="_blank" rel="noopener" class="iw-naver-badge">네이버지도</a>
       </div>
-      <div class="iw-avg">
-        <span class="iw-avg-stars">${avgStars(avg)}</span>
-        <span class="iw-avg-label">${cnt > 0 ? `${avg}점 (${cnt}명)` : '평가 없음'}</span>
-      </div>
-      <div class="iw-myrate">
-        <span class="iw-myrate-label">내 평가:</span>
-        <div class="star-row" id="stars-${pid}">${myStars}</div>
+      <div class="iw-rating-card">
+        <div class="iw-rating-row">
+          <span class="iw-avg-stars">${avgStars(avg)}</span>
+          <span class="iw-avg-label">${cnt > 0 ? `${avg}점 (${cnt}명)` : '평가 없음'}</span>
+        </div>
+        <div class="iw-rating-divider"></div>
+        <div class="iw-rating-row iw-myrate">
+          <span class="iw-myrate-label">내 평가</span>
+          <div class="star-row" id="stars-${pid}">${myStars}</div>
+        </div>
       </div>
       <div class="iw-menu">${esc(p.menu || '')}</div>
       ${tagBadges}
       ${p.comment ? `<div class="iw-comment">${commentLinesHtml(p.comment)}</div>` : ''}
-      <div class="iw-author">추가한 사람: ${esc(p.added_by || '익명')}</div>
+      <div class="iw-author">추가한 사람 · ${esc(p.added_by || '익명')}</div>
       <div class="iw-actions">
         <button class="iw-sub-btn" data-action="nav" data-id="${pid}">🧭 길찾기</button>
         <button class="iw-sub-btn" data-action="share" data-id="${pid}">🔗 공유</button>
-        <button class="iw-sub-btn ${favs.has(p.id)?'fav-on':''}" data-action="fav" data-id="${pid}" aria-label="찜 토글" style="flex:0 0 40px;">${favs.has(p.id)?'❤️':'🤍'}</button>
-        <button class="iw-sub-btn" data-action="more" data-id="${pid}" aria-label="더보기" style="flex:0 0 34px;">⋯</button>
+        <button class="iw-sub-btn iw-btn-icon ${favs.has(p.id)?'fav-on':''}" data-action="fav" data-id="${pid}" aria-label="찜 토글">${favs.has(p.id)?'❤️':'🤍'}</button>
+        <button class="iw-sub-btn iw-btn-icon" data-action="more" data-id="${pid}" aria-label="더보기">⋯</button>
       </div>
-      <div class="iw-actions iw-more" style="display:none;border-top:none;padding-top:0;">
-        <button class="iw-move-btn" data-action="edit" data-id="${pid}">✏️ 정보 수정</button>
-        <button class="iw-move-btn" data-action="move" data-id="${pid}">📍 위치 수정</button>
-        <button class="iw-del-btn" data-action="del" data-id="${pid}">🗑 삭제</button>
+      <div class="iw-actions iw-more" style="display:none;">
+        <button class="iw-sub-btn iw-btn-edit" data-action="edit" data-id="${pid}">✏️ 정보 수정</button>
+        <button class="iw-sub-btn iw-btn-move" data-action="move" data-id="${pid}">📍 위치 수정</button>
+        <button class="iw-sub-btn iw-btn-del" data-action="del" data-id="${pid}">🗑 삭제</button>
       </div>
     </div>`;
 }
