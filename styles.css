@@ -248,7 +248,8 @@ header span { font-size: 11px; color: var(--muted); margin-top: 2px; display: bl
 .item-dist { font-size: 10px; color: var(--move); font-weight: 700; }
 
 /* ── 지도 ── */
-#map { flex: 1; }
+/* 핀치/드래그 제스처를 브라우저가 아닌 지도 SDK가 처리하도록 (페이지 줌 방지, viewport 제한 불필요) */
+#map { flex: 1; touch-action: none; }
 
 /* ── 인포윈도우 ── */
 .iw {
@@ -556,4 +557,7 @@ button:active { transform: scale(.95); }
     border-radius: 3px; background: var(--border); margin: 0 auto;
   }
   .sidebar-header { cursor: pointer; }
+  /* iOS는 font-size 16px 미만 입력창 포커스 시 페이지를 자동 확대함 */
+  .search-wrap input, .form-row input, .form-row select,
+  .fixed-add-form input, #sort-select { font-size: 16px; }
 }
