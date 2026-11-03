@@ -288,6 +288,13 @@ const manifestOk = await page.evaluate(async () => {
   return r.ok && j.name && j.icons.length === 2;
 });
 ok('PWA manifest (SVG+PNG 아이콘)', manifestOk);
+
+// 접근성/모바일: viewport 확대 제한 금지 + 지도 touch-action
+const vpInfo = await page.evaluate(() => ({
+  content: document.querySelector('meta[name="viewport"]').content,
+  mapTouch: getComputedStyle(document.getElementById('map')).touchAction
+}));
+ok('viewport 확대 허용 + #map touch-action:none', !/user-scalable\s*=\s*(no|0)|maximum-scale\s*=\s*1(\.0)?\b/.test(vpInfo.content) && vpInfo.mapTouch === 'none', JSON.stringify(vpInfo));
 const pngOk = await page.evaluate(async () => (await fetch('icon-180.png')).ok);
 ok('iOS용 icon-180.png 제공', pngOk);
 await page.waitForTimeout(400);
